@@ -16,7 +16,7 @@
   let tab = 'review';    // what the right-hand side shows on a wide screen: 'review' or 'sheet'
   let previewTimer = null;
   let siteOpen = null;           // site details open or folded to one line (null: decide by itself)
-  const openRows = new Set();   // rows whose details (location, qty, colour, glass, remarks, photo) are open
+  const openRows = new Set();   // rows whose details (quantity, remarks, type, move, delete) are open
   // one step at a time on every screen (measurement -> approval -> production sheet)
   const wide = () => false;
   const allApproved = (j) => j.items.length > 0 && j.items.every((i) => i.approved);
@@ -88,7 +88,7 @@
     return {
       id: uid(), type: typeKey, code: nextCode(j, typeKey),
       w: ['', '', ''], h: ['', '', ''],
-      location: '', qty: 1, colour: settings.defaults.colour, design: '', glass: defaultGlass(typeKey), remarks: '', photo: null,
+      location: '', qty: 1, colour: settings.defaults.colour, design: '', glass: defaultGlass(typeKey), remarks: '',
       final: null, approved: false, approvedAt: null, approvedSig: null,
     };
   }
@@ -390,7 +390,7 @@
       <div class="row">
         <div class="codecol">
           <input class="code ${isDup ? 'bad' : ''}" data-k="code" value="${esc(it.code)}" title="${isDup ? 'This code is used twice' : 'Code (you can change it)'}" aria-label="Code">
-          <button class="icon more" data-act="more" title="More: location, quantity, colour, glass, remarks, photo">${open ? '▴' : '⋯'}</button>
+          <button class="icon more" data-act="more" title="More: quantity, remarks, type, move, delete">${open ? '▴' : '⋯'}</button>
         </div>
         <div class="trio" data-g="w">${mInput('w', 0, 'Width left', it)}${mInput('w', 1, 'Width centre', it)}${mInput('w', 2, 'Width right', it)}</div>
         <div class="trio" data-g="h">${mInput('h', 0, 'Height top', it)}${mInput('h', 1, 'Height middle', it)}${mInput('h', 2, 'Height bottom', it)}</div>
@@ -407,9 +407,7 @@
           <label class="f"><span>Quantity</span><input inputmode="numeric" pattern="[0-9]*" data-k="qty" value="${esc(it.qty == null ? 1 : it.qty)}"></label>
           <label class="f wide"><span>Remarks</span><textarea data-k="remarks" rows="2" placeholder="Opening side, site conditions…">${esc(it.remarks)}</textarea></label>
         </div>
-        <div class="photo">
-          ${it.photo ? `<img src="${it.photo}" alt="Photo of ${esc(it.code)}" data-act="view-photo"><button class="btn small ghost" data-act="del-photo">Remove photo</button>` : ''}
-          <label class="btn small">${it.photo ? 'Change photo' : '📷 Add photo'}<input type="file" accept="image/*" data-photo hidden></label>
+        <div class="dactions">
           <span class="grow"></span>
           <select data-k="type" aria-label="Type">${C.types.map((x) => `<option value="${x.key}" ${x.key === it.type ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}</select>
           <button class="icon" data-act="up" title="Move up">↑</button>
@@ -736,23 +734,7 @@
     return `<div class="keyrow"><input data-key-k value="${esc(k)}" maxlength="8" placeholder="Code" aria-label="Code"><input data-key-t value="${esc(t)}" placeholder="What it means" aria-label="What it means"><button class="icon danger" data-act="key-del" title="Delete">✕</button></div>`;
   }
 
-  // ---------- photo ----------
-  function readPhoto(file) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      const url = URL.createObjectURL(file);
-      img.onload = () => {
-        const max = 1280, k = Math.min(1, max / Math.max(img.width, img.height));
-        const c = document.createElement('canvas');
-        c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
-        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-        URL.revokeObjectURL(url);
-        resolve(c.toDataURL('image/jpeg', 0.75));
-      };
-      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Not a picture')); };
-      img.src = url;
-    });
-  }
+
 
   // ---------- events ----------
   const itemOf = (el) => { const card = el.closest('[data-id]'); return card && job.items.find((i) => i.id === card.dataset.id); };
@@ -830,10 +812,6 @@
       if (confirm(`Change the code to ${nextCode(job, el.value)}?`)) it.code = nextCode(job, el.value);
       touch(); viewWork();
     }
-    if (el.matches('[data-photo]') && it && el.files[0]) {
-      try { it.photo = await readPhoto(el.files[0]); touch(); await saveNow(); viewWork(); }
-      catch (err) { alert('Could not use this photo: ' + err.message); }
-    }
     if (el.dataset.final && it) renderPreview();
   });
 
@@ -879,13 +857,6 @@
       sec.classList.toggle('open', siteOpen); sec.querySelector('.site-form').hidden = !siteOpen;
       b.setAttribute('aria-expanded', siteOpen); b.querySelector('i').textContent = siteOpen ? 'Done' : 'Edit';
       if (siteOpen) sec.querySelector('input').focus();
-    }
-    if (act === 'del-photo' && it) { it.photo = null; touch(); viewWork(); }
-    if (act === 'view-photo') {
-      const box = document.createElement('div');
-      box.className = 'lightbox'; box.innerHTML = `<img src="${b.src}" alt="">`;
-      box.onclick = () => box.remove();
-      document.body.appendChild(box);
     }
     if (act === 'save') { await saveNow(); toast('Saved'); }
     if (act === 'to-review') {

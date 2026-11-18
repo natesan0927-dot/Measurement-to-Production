@@ -19,7 +19,7 @@ On a phone, open it and choose *Add to Home screen* to install it as an app.
    - **Location, colour and glass** are always shown under the measurements. A new item starts as **White**,
      with **5 mm Clear** glass for a window and **5 mm Pinned** for a ventilator; pick another from the list (locations: Hall, Kitchen, Master bedroom, …),
      or **Other…** to type a new one (it is then kept in the list). The starting colour and glass, and the location / colour / glass lists, can be changed under Settings.
-   - **⋯** opens the rest: quantity, remarks, photo, type, move and delete.
+   - **⋯** opens the rest: quantity, remarks, type, move and delete.
 
    Under each line the least size and the difference show straight away; the least boxes turn yellow
    and a set that differs by more than 8 mm turns red.
@@ -47,7 +47,7 @@ The 8 mm limit, the design keys and the colour / glass suggestion lists can be c
 
 ## Where the data is kept
 
-On the device itself (browser storage, room for photos). It works with no internet on site and can be installed
+On the device itself (browser storage). It works with no internet on site and can be installed
 as an app on a phone ("Add to Home screen"). Use *Settings → Download backup* to keep a copy or move jobs to another device.
 
 ## Files
