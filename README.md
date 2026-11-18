@@ -16,7 +16,8 @@ On a phone, open it and choose *Add to Home screen* to install it as an app.
      They can also be managed under Settings.
    - **Design drawing**: the design codes are drawn as a window to its width × height (sliding arrows,
      opening triangles, fixed panes, fan, mesh, arch), on the approval and the production sheet (not while measuring).
-   - **Location, colour and glass** are always shown under the measurements. A new item starts as **White**,
+   - **Location, colour, glass and section** are always shown under the measurements.
+     Section: **Inventa** for a window, **Optima** for a ventilator as standard. A new item starts as **White**,
      with **5 mm Clear** glass for a window and **5 mm Pinned** for a ventilator; pick another from the list (locations: Hall, Kitchen, Master bedroom, …),
      or **Other…** to type a new one (it is then kept in the list). The starting colour and glass, and the location / colour / glass lists, can be changed under Settings.
    - **⋯** opens the rest: quantity, remarks, type, move and delete.
@@ -36,7 +37,7 @@ when the one before is done (the sidebar shows them, locked until then).
    - *Approve all within 8 mm* approves every item that is complete and within the limit.
    - If a measurement is changed later, that item's approval is dropped and it has to be approved again.
    - **Generate production sheet** opens only when every item is approved.
-4. **Production sheet** – lists the approved items: code, final width × height, quantity, design, colour, glass and remarks,
+4. **Production sheet** – lists the approved items: code, final width × height, quantity, section, design, colour, glass and remarks,
    with **4 empty boxes per window for the cutting sizes** the production team works out and writes in by hand, and the total quantity,
    ready to print or save as PDF (A4 landscape) for the factory.
 

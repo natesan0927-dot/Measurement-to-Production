@@ -3,7 +3,7 @@
  * (The tolerance and the suggestion lists can also be changed in the app, under Settings.)
  */
 window.CONFIG = {
-  version: '1.10 · 18-11-2026',   // shown in the sidebar and Settings, to see which version is open
+  version: '1.11 · 18-11-2026',   // shown in the sidebar and Settings, to see which version is open
   company: 'TITANS WINDOWS',
   jobPrefix: 'M2P-',            // job numbers: M2P-0001, M2P-0002, ...
 
@@ -27,7 +27,9 @@ window.CONFIG = {
   defaults: {
     colour: 'White',
     glass: { W: '5 mm Clear', V: '5 mm Pinned' },   // windows / ventilators
+    section: { W: 'Inventa', V: 'Optima' },         // profile section: windows / ventilators
   },
+  sections: ['Inventa', 'Optima'],
   locations: [
     'Hall', 'Living', 'Dining', 'Kitchen', 'Master bedroom', 'Bedroom 2', 'Bedroom 3', 'Kids bedroom',
     'Bathroom', 'Toilet', 'Pooja', 'Study', 'Balcony', 'Staircase', 'Utility', 'Store', 'Guest bedroom',
