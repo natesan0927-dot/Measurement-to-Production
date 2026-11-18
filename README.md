@@ -44,8 +44,8 @@ when the one before is done (the sidebar shows them, locked until then).
    ready to print or save as PDF (A4 landscape) for the factory.
 
 **Two production sheets** (switch at the top of step 3):
-- **Factory sheet**: code, size, section, design, colour, glass, remarks and 4 large boxes per window
-  for the cutting sizes, written in by hand.
+- **Factory sheet**, in this order: Code | W | H | Design | Glass | Colour | Section | 4 large cutting-size
+  boxes (written in by hand) | Remarks (taking the rest of the width).
 - **Installation sheet**: the same plus location, and under each window a **link and QR code to its site photos**.
   Installers open it on any phone with no login (`photos.html`).
 

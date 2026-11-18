@@ -700,23 +700,20 @@
     const count = (k) => items.filter((i) => i.type === k).length;
     const total = items.length;
     const waiting = items.reduce((a, i) => a + (i.photos || []).filter((p) => p.status !== 'done').length, 0);
+    // column order: Code, W, H, Design, Glass, Colour, Section, (cutting sizes), Remarks taking the rest
     const cols = install
-      ? ['Code', 'Location', ['Width', 'num'], ['Height', 'num'], 'Section', 'Design', 'Colour', 'Glass', 'Remarks']
-      : ['Code', ['Width', 'num'], ['Height', 'num'], 'Section', 'Design', 'Colour', 'Glass', 'Remarks', ['Cutting sizes <small>(filled by production)</small>', 'cutth']];
-    const head = cols.map((c) => Array.isArray(c) ? `<th class="${c[1]}">${c[0]}</th>` : `<th>${c}</th>`).join('');
+      ? [['Code', 'fit'], ['Location', 'fit'], ['W', 'num fit'], ['H', 'num fit'], ['Design', 'fit'], ['Glass', 'fit'], ['Colour', 'fit'], ['Section', 'fit'], ['Remarks', 'rest']]
+      : [['Code', 'fit'], ['W', 'num fit'], ['H', 'num fit'], ['Design', 'fit'], ['Glass', 'fit'], ['Colour', 'fit'], ['Section', 'fit'], ['Cutting sizes <small>(filled by production)</small>', 'cutth'], ['Remarks', 'rest']];
+    const head = cols.map(([t, c]) => `<th class="${c}">${t}</th>`).join('');
+    const common = (it) => `
+          <td class="num fit"><b>${esc(it.final.w)}</b></td><td class="num fit"><b>${esc(it.final.h)}</b></td>
+          <td class="sh-design fit"><b>${esc(it.design)}</b></td><td class="fit">${esc(it.glass)}</td><td class="fit">${esc(it.colour)}</td><td class="fit">${esc(it.section)}</td>`;
     const row = (it) => install
-      ? `<tr class="has-sub">
-          <td><b>${esc(it.code)}</b></td><td>${esc(it.location)}</td>
-          <td class="num"><b>${esc(it.final.w)}</b></td><td class="num"><b>${esc(it.final.h)}</b></td>
-          <td>${esc(it.section)}</td><td class="sh-design"><b>${esc(it.design)}</b></td><td>${esc(it.colour)}</td><td>${esc(it.glass)}</td><td>${esc(it.remarks)}</td>
-        </tr>
+      ? `<tr class="has-sub"><td class="fit"><b>${esc(it.code)}</b></td><td class="fit">${esc(it.location)}</td>${common(it)}<td class="rest">${esc(it.remarks)}</td></tr>
         <tr class="phrow"><td colspan="${cols.length}">${photoLine(it)}</td></tr>`
-      : `<tr>
-          <td><b>${esc(it.code)}</b></td>
-          <td class="num"><b>${esc(it.final.w)}</b></td><td class="num"><b>${esc(it.final.h)}</b></td>
-          <td>${esc(it.section)}</td><td class="sh-design"><b>${esc(it.design)}</b></td><td>${esc(it.colour)}</td><td>${esc(it.glass)}</td><td>${esc(it.remarks)}</td>
+      : `<tr><td class="fit"><b>${esc(it.code)}</b></td>${common(it)}
           <td class="cut"><div class="cutboxes"><span></span><span></span><span></span><span></span></div></td>
-        </tr>`;
+          <td class="rest">${esc(it.remarks)}</td></tr>`;
     return `
       ${install && waiting ? `<p class="warn noprint">${waiting} site photo${waiting === 1 ? ' is' : 's are'} still waiting to upload from the measuring phone. Their links appear here once uploaded.</p>` : ''}
       <article class="sheet ${install ? 'install' : ''}">

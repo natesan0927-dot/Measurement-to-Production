@@ -568,3 +568,12 @@ button.stat:hover { transform: translateY(-2px); border-color: var(--border-stro
 .mt.vert tr.sum th, .mt.vert tr.sum td { border-top: 2px solid var(--border-strong); }
 .mt.vert tr.sum + tr.sum th, .mt.vert tr.sum + tr.sum td { border-top-width: 1px; }
 @media (max-width: 640px) { .mt.vert { flex-basis: 100%; } }
+
+/* sheet columns: everything as narrow as it can be, Remarks takes the rest of the width */
+.sh-table { table-layout: auto; width: 100%; }
+.sh-table .fit { width: 1%; white-space: nowrap; }
+.sh-table td.cut, .sh-table th.cutth { width: 1%; }
+.sh-table td.cut { min-width: 330px; }
+.sh-table .rest { width: auto; min-width: 160px; }
+@media print { .sh-table td.cut { min-width: 0; width: 34%; } .sh-table .rest { min-width: 0; } }
+@media print { body { background: #fff !important; } }
