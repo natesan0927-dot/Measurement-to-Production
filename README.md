@@ -53,4 +53,8 @@ as an app on a phone ("Add to Home screen"). Use *Settings → Download backup* 
 
 ## Running it
 
-It is a plain static site: no build step. It runs on Vercel from this repository. To make changes, test it on a PC with `python -m http.server 8000` and open http://localhost:8000.
+It is a plain static site: no build step. It runs on Vercel from the `main` branch.
+
+Making changes: work on the `dev` branch and run `python dev.py`, then open http://localhost:8811.
+The page reloads by itself every time a file is saved. When the changes are approved, merge `dev` into `main`;
+that updates the online app.
