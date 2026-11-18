@@ -511,3 +511,5 @@ button.stat:hover { transform: translateY(-2px); border-color: var(--border-stro
 .navitem.stage.locked { opacity: .45; cursor: not-allowed; }
 .navitem.stage.locked:hover { background: none; color: var(--blue-300); }
 .steps span { cursor: not-allowed; }
+
+.ver { margin-top: 6px; font-size: 11px; color: var(--blue-400); opacity: .8; }

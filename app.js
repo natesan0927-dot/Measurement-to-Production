@@ -710,6 +710,7 @@
         ${chipList('glass', 'Glass choices')}
         <div class="actions"><button class="btn gold" data-act="save-settings">Save settings</button></div>
       </section>
+      <p class="sub">Version ${esc(C.version)}</p>
       <section class="card">
         <h2>Backup</h2>
         <p class="sub">All jobs are kept on this phone / PC. Download a backup now and then, or to move jobs to another device.</p>
@@ -952,6 +953,7 @@
     if (s) settings = Object.assign(settings, s, { defaults: Object.assign({}, settings.defaults, s.defaults || {}) });
     if (!settings.glass.includes('5 mm Pinned')) settings.glass.splice(1, 0, '5 mm Pinned');
     fillLists();
+    document.getElementById('ver').textContent = 'Version ' + C.version;
     route();
   })();
 })();

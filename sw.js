@@ -3,7 +3,7 @@
  * app is never out of date; the stored copy is used only when offline. Measurements are saved on
  * the device itself, not here.
  */
-const CACHE = 'm2p-v8';
+const CACHE = 'm2p-v9';
 const SHELL = ['./', './index.html', './style.css', './config.js', './db.js', './rules.js', './drawing.js', './app.js',
   './manifest.webmanifest', './assets/titans_logo_trim.png', './assets/app-icon-192.png', './assets/favicon.png'];
 const FONTS = /^https:\/\/(fonts\.googleapis\.com|fonts\.gstatic\.com)\//;
@@ -20,8 +20,10 @@ self.addEventListener('fetch', (ev) => {
   if (ev.request.method !== 'GET') return;
   const url = new URL(ev.request.url);
   if (url.origin !== self.location.origin && !FONTS.test(ev.request.url)) return;
+  // own files: always ask the server (never a stale browser copy); the stored copy is only for no internet
+  const req = url.origin === self.location.origin ? new Request(ev.request, { cache: 'no-cache' }) : ev.request;
   ev.respondWith(
-    fetch(ev.request)
+    fetch(req)
       .then((res) => {
         if (res.ok || res.type === 'opaque') {
           const copy = res.clone();

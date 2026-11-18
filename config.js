@@ -3,6 +3,7 @@
  * (The tolerance and the suggestion lists can also be changed in the app, under Settings.)
  */
 window.CONFIG = {
+  version: '1.9 · 18-11-2026',   // shown in the sidebar and Settings, to see which version is open
   company: 'TITANS WINDOWS',
   jobPrefix: 'M2P-',            // job numbers: M2P-0001, M2P-0002, ...
 
