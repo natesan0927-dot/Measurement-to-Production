@@ -641,3 +641,17 @@ button.stat:hover { transform: translateY(-2px); border-color: var(--border-stro
   .sh-info { font-size: 10.5pt; } .sh-info td { color: #000; }
   .sh-foot { font-size: 10.5pt; }
 }
+
+/* production sheets: vertical lines between the columns, like the horizontal ones */
+.sh-table { border-collapse: collapse; border-left: 1.5px solid #9AA1BC; border-right: 1.5px solid #9AA1BC; }
+.sh-table tbody td { border-right: 1.5px solid #9AA1BC; }
+.sh-table tbody td:last-child { border-right: 0; }
+.sh-table thead th { border-right: 1px solid rgba(255,255,255,.28); }
+.sh-table thead th:last-child { border-right: 0; }
+.sh-table tbody tr.phrow td { border-right: 0; }
+@media print {
+  .sh-table { border-left: 0.4mm solid #444; border-right: 0.4mm solid #444; }
+  .sh-table tbody td { border-right: 0.4mm solid #444 !important; }
+  .sh-table tbody td:last-child, .sh-table tbody tr.phrow td { border-right: 0 !important; }
+  .sh-table thead th { border-right: 0.3mm solid #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
