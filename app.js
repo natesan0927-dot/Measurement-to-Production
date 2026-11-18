@@ -14,6 +14,7 @@
   let pane = 'job';      // what a phone shows: 'job' (measurements), 'review' or 'sheet'
   let tab = 'review';    // what the right-hand side shows on a wide screen: 'review' or 'sheet'
   let previewTimer = null;
+  let siteOpen = null;           // site details open or folded to one line (null: decide by itself)
   const openRows = new Set();   // rows whose details (location, qty, colour, glass, remarks, photo) are open
   const wide = () => window.matchMedia('(min-width: 1000px)').matches;
 
@@ -65,7 +66,7 @@
     const items = j.items || [];
     if (!items.length) return 'measuring';
     if (items.every((i) => i.approved)) return 'approved';
-    if (j.sentToReview) return 'review';
+    if (j.sentToReview || items.some((i) => i.approved)) return 'review';
     return 'measuring';
   }
   const STATUS = { measuring: 'Measuring', review: 'Waiting approval', approved: 'Approved for production' };
@@ -181,6 +182,7 @@
     if (view === 'settings') { viewSettings(); return renderNav(); }
     job = await DB.getJob(id);
     if (!job) { location.hash = '#/'; return; }
+    siteOpen = null; openRows.clear();
     job.items = job.items || [];
     job.items.forEach(dropStaleApproval);
     if (work) return viewWork();
@@ -224,37 +226,35 @@
       <div data-steps></div>
       <div class="workspace">
         <div class="formcol noprint">
-          <div class="head">
-            <div><h1>${esc(job.no)} <small data-saved>Saved</small></h1><p class="sub">One line per window, in mm: 3 widths (left, centre, right), 3 heights (top, middle, bottom), then tap Design.</p></div>
-            <button class="btn ghost danger small" data-act="del-job">Delete job</button>
+          <div class="jobhead">
+            <h1>${esc(job.no)}</h1><span class="saved" data-saved>Saved</span>
+            <span class="grow"></span>
+            <button class="linkbtn danger" data-act="del-job">Delete job</button>
           </div>
-          <section class="card">
-            <h2>Site details</h2>
-            <div class="grid">
+          <section class="site ${isSiteOpen() ? 'open' : ''}">
+            <button class="site-sum" data-act="site" aria-expanded="${isSiteOpen()}"><span data-sitesum>${siteSummary()}</span><i>${isSiteOpen() ? 'Done' : 'Edit'}</i></button>
+            <div class="site-form" ${isSiteOpen() ? '' : 'hidden'}>
               ${field('Customer name', 'customer')}
               ${field('Phone', 'phone', 'tel')}
+              ${field('Date', 'date', 'date')}
               ${field('Site / project', 'site')}
               ${field('Measured by', 'measuredBy')}
-              ${field('Address', 'address', 'text', 'wide')}
-              ${field('Date', 'date', 'date')}
+              ${field('Address', 'address')}
             </div>
           </section>
-          ${job.items.length ? `<div class="rowhead"><span>Code</span><span>Width <small>L · C · R</small></span><span>Height <small>T · M · B</small></span><span>Design</span><span></span></div>` : ''}
+          ${job.items.length ? `<div class="rowhead" title="In mm: 3 widths (left, centre, right), 3 heights (top, middle, bottom), then tap Design"><span>Code</span><span>Width <small>mm</small></span><span>Height <small>mm</small></span><span>Design</span></div>` : ''}
           <div class="items" data-items>
             ${job.items.map((it, idx) => itemCard(it, idx, dup)).join('')}
           </div>
-          ${job.items.length ? '' : `<div class="empty">No windows yet. Add a window or a ventilator below.</div>`}
+          ${job.items.length ? '' : `<div class="empty">No windows yet. Add a window or a ventilator below,<br>then type 3 widths (left, centre, right) and 3 heights (top, middle, bottom) in mm.</div>`}
           <div class="addbar">
             ${C.types.map((t) => `<button class="btn" data-act="add" data-type="${t.key}">+ Add ${esc(t.label)} <em>${esc(nextCode(job, t.key))}</em></button>`).join('')}
           </div>
         </div>
         <aside class="previewcol">
           <div class="previewhead noprint">
-            <div class="ptabs">
-              <button data-act="tab" data-tab="review">Review &amp; approve</button>
-              <button data-act="tab" data-tab="sheet">Production sheet</button>
-            </div>
-            <small class="muted">Updates as you type</small>
+            <div><h2 data-ptitle></h2><small class="muted">Updates as you type</small></div>
+            <span data-paction></span>
           </div>
           <div data-preview></div>
         </aside>
@@ -270,7 +270,11 @@
     if (!ws) return;
     ws.dataset.pane = pane;
     $app.querySelector('[data-steps]').innerHTML = steps(pane);
-    $app.querySelectorAll('.ptabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
+    const show = wide() ? tab : pane;
+    $app.querySelector('[data-ptitle]').textContent = show === 'sheet' ? 'Production sheet' : 'Review & approve';
+    $app.querySelector('[data-paction]').innerHTML = show === 'sheet'
+      ? `<button class="btn gold small" data-act="print">Print / Save PDF</button>`
+      : `<button class="btn small" data-act="approve-ok">Approve all within ${settings.toleranceMm} mm</button>`;
     const approved = job.items.filter((i) => i.approved).length;
     const foot = {
       job: `<button class="btn" data-act="save">Save</button>
@@ -308,6 +312,11 @@
       if (it) card.querySelector('[data-pill]').innerHTML = it.approved ? `<span class="pill approved">Approved</span>` : '';
     });
   }
+  function isSiteOpen() { return siteOpen == null ? !job.customer : siteOpen; }
+  function siteSummary() {
+    const bits = [job.site, job.measuredBy && `by ${job.measuredBy}`, fmtDate(job.date)].filter(Boolean).map(esc);
+    return `<b>${esc(job.customer) || 'Customer & site details'}</b>${bits.length ? `<small>${bits.join(' · ')}</small>` : ''}`;
+  }
   function field(label, key, type = 'text', cls = '') {
     return `<label class="f ${cls}"><span>${label}</span><input type="${type}" data-job="${key}" value="${esc(job[key] || '')}"></label>`;
   }
@@ -319,11 +328,13 @@
     const sub = [it.location, qtyOf(it) > 1 ? `× ${qtyOf(it)}` : '', it.colour, it.glass].filter(Boolean).join(' · ');
     return `<section class="item ${it.type === 'V' ? 'vent' : ''} ${open ? 'open' : ''}" data-id="${it.id}">
       <div class="row">
-        <input class="code ${isDup ? 'bad' : ''}" data-k="code" value="${esc(it.code)}" title="${isDup ? 'This code is used twice' : 'Code (you can change it)'}" aria-label="Code">
+        <div class="codecol">
+          <input class="code ${isDup ? 'bad' : ''}" data-k="code" value="${esc(it.code)}" title="${isDup ? 'This code is used twice' : 'Code (you can change it)'}" aria-label="Code">
+          <button class="icon more" data-act="more" title="More: location, quantity, colour, glass, remarks, photo">${open ? '▴' : '⋯'}</button>
+        </div>
         <div class="trio" data-g="w">${mInput('w', 0, 'Width left', it)}${mInput('w', 1, 'Width centre', it)}${mInput('w', 2, 'Width right', it)}</div>
         <div class="trio" data-g="h">${mInput('h', 0, 'Height top', it)}${mInput('h', 1, 'Height middle', it)}${mInput('h', 2, 'Height bottom', it)}</div>
         <button class="design ${it.design ? '' : 'empty'}" data-act="keypad" title="Design">${it.design ? esc(it.design) : 'Design'}</button>
-        <button class="icon more" data-act="more" title="More: location, quantity, colour, glass, remarks, photo">${open ? '▴' : '⋯'}</button>
       </div>
       <div class="rowsub"><span data-status>${rowStatus(it)}</span><span class="muted" data-sub>${esc(sub)}</span><span data-pill>${it.approved ? `<span class="pill approved">Approved</span>` : ''}</span></div>
       <div class="details" ${open ? '' : 'hidden'}>
@@ -347,7 +358,8 @@
     </section>`;
   }
   function mInput(dim, i, label, it) {
-    return `<input inputmode="numeric" pattern="[0-9]*" data-m="${dim}" data-i="${i}" value="${esc(it[dim][i])}" placeholder="${'LCRTMB'[dim === 'w' ? i : i + 3]}" aria-label="${label}" title="${label}">`;
+    const tag = 'LCRTMB'[dim === 'w' ? i : i + 3];
+    return `<label class="mv"><i>${tag}</i><input inputmode="numeric" pattern="[0-9]*" data-m="${dim}" data-i="${i}" value="${esc(it[dim][i])}" aria-label="${label}" title="${label}"></label>`;
   }
   // short status under the line: least size, and the difference in red if over the limit
   function rowStatus(it) {
@@ -477,9 +489,6 @@
         <div class="${flagged ? 'over' : ''}"><b>${flagged}</b><span>over ${tol} mm</span></div>
         <div class="${incomplete ? 'over' : ''}"><b>${incomplete}</b><span>incomplete</span></div>
       </div>
-      <div class="actions">
-        <button class="btn" data-act="approve-ok">Approve all within ${tol} mm</button>
-      </div>
       <div class="review">
         ${rows.map(({ it, r }) => reviewCard(it, r)).join('')}
       </div>`;
@@ -544,7 +553,6 @@
     return `
       <div class="sheetbar noprint">
         <p class="sub">${pending ? `<span class="warn">${pending} item${pending === 1 ? ' is' : 's are'} not approved yet and not on this sheet.</span>` : job.items.length ? 'All items approved.' : 'No items yet.'}</p>
-        <button class="btn gold small" data-act="print">Print / Save PDF</button>
       </div>
       <article class="sheet">
         <header class="sh-head">
@@ -643,7 +651,11 @@
       return;
     }
     if (!job) return;
-    if (el.dataset.job) { job[el.dataset.job] = el.value; previewSoon(); return touch(); }
+    if (el.dataset.job) {
+      job[el.dataset.job] = el.value;
+      const sum = $app.querySelector('[data-sitesum]'); if (sum) sum.innerHTML = siteSummary();
+      previewSoon(); return touch();
+    }
     const it = itemOf(el);
     if (!it) return;
     if (el.dataset.m) {
@@ -730,6 +742,13 @@
       const card = b.closest('.item'), open = !openRows.has(it.id);
       open ? openRows.add(it.id) : openRows.delete(it.id);
       card.classList.toggle('open', open); card.querySelector('.details').hidden = !open; b.textContent = open ? '▴' : '⋯';
+    }
+    if (act === 'site') {
+      siteOpen = !isSiteOpen();
+      const sec = b.closest('.site');
+      sec.classList.toggle('open', siteOpen); sec.querySelector('.site-form').hidden = !siteOpen;
+      b.setAttribute('aria-expanded', siteOpen); b.querySelector('i').textContent = siteOpen ? 'Done' : 'Edit';
+      if (siteOpen) sec.querySelector('input').focus();
     }
     if (act === 'del-photo' && it) { it.photo = null; touch(); viewWork(); }
     if (act === 'view-photo') {
