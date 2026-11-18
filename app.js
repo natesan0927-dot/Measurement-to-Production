@@ -246,7 +246,6 @@
       </div>
       <div class="jobgrid">
         ${jobs.length ? jobs.map(jobCard).join('') : `<div class="empty big">
-            <div class="empty-art">${DRAW.svg('SL SL', 1600, 1200)}</div>
             <b>No jobs yet</b><span>Tap <b>+ New job</b> to start measuring your first site.</span></div>`}
       </div>`;
     applyHomeFilter();
@@ -263,15 +262,12 @@
     const pct = n ? Math.round((ok / n) * 100) : 0;
     const st = jobStatus(j);
     const over = items.filter((i) => !i.approved && RULES.check(i, settings.toleranceMm).flagged).length;
-    const thumbs = items.filter((i) => i.design).slice(0, 5).map((i) => {
-      const r = RULES.check(i, settings.toleranceMm);
-      return `<span class="thumb" title="${esc(i.code)} ${esc(i.design)}">${DRAW.svg(i.design, i.final ? i.final.w : r.w.min, i.final ? i.final.h : r.h.min)}</span>`;
-    }).join('');
+
     return `<a class="jobcard" href="#/job/${j.id}" data-status="${st}" data-text="${esc([j.no, j.customer, j.site, j.address].join(' ').toLowerCase())}">
       <div class="jc-top"><span class="jobno">${esc(j.no)}</span><span class="pill ${st}">${STATUS[st]}</span></div>
       <b class="jc-name">${esc(j.customer || 'No customer name')}</b>
       <span class="jc-meta">${esc(j.site || j.address || 'Site not set')} · ${fmtDate(j.date)}</span>
-      <div class="jc-thumbs">${thumbs || '<span class="muted">No designs yet</span>'}</div>
+      <div class="jc-codes">${items.slice(0, 6).map((i) => `<span>${esc(i.code)}${i.design ? ' · ' + esc(i.design) : ''}</span>`).join('') || '<span class="muted">No windows yet</span>'}${items.length > 6 ? `<span class="muted">+${items.length - 6} more</span>` : ''}</div>
       <div class="bar"><i style="width:${pct}%"></i></div>
       <div class="jc-foot"><span><b>${ok}</b>/${n} approved</span>${over ? `<span class="warn">⚠ ${over} over ${settings.toleranceMm} mm</span>` : `<span>${items.reduce((a, i) => a + qtyOf(i), 0)} pcs</span>`}</div>
     </a>`;
@@ -329,10 +325,11 @@
     ws.dataset.pane = pane;
     $app.querySelector('[data-steps]').innerHTML = steps(pane);
     const show = wide() ? tab : pane;
-    $app.querySelector('[data-ptitle]').textContent = show === 'sheet' ? 'Production sheet' : 'Approve each window';
+    $app.querySelector('[data-ptitle]').textContent = show === 'sheet' ? (sheetKind === 'install' ? 'Installation sheet' : 'Factory sheet') : 'Approve each window';
     $app.querySelector('[data-psub]').textContent = `${job.no} · ${job.customer || 'No customer name'}` +
-      (show === 'sheet' ? ' · ready for the factory' : ' · check the sizes, then approve');
-    $app.querySelector('[data-paction]').innerHTML = show === 'sheet' ? ''
+      (show === 'sheet' ? (sheetKind === 'install' ? ' · for the installation team' : ' · for the factory') : ' · check the sizes, then approve');
+    $app.querySelector('[data-paction]').innerHTML = show === 'sheet'
+      ? `<div class="seg"><button data-act="kind" data-k="factory" class="${sheetKind === 'factory' ? 'on' : ''}">Factory sheet</button><button data-act="kind" data-k="install" class="${sheetKind === 'install' ? 'on' : ''}">Installation sheet</button></div>`
       : `<button class="btn small" data-act="approve-ok">Approve all within ${settings.toleranceMm} mm</button>`;
     const approved = job.items.filter((i) => i.approved).length;
     const n = job.items.length;
@@ -386,7 +383,7 @@
   function itemCard(it, idx, dup) {
     const isDup = dup && dup.has(String(it.code).trim().toUpperCase());
     const open = openRows.has(it.id);
-    const sub = qtyOf(it) > 1 ? `Qty ${qtyOf(it)}` : '';
+    const sub = rowSubText(it);
     return `<section class="item ${it.type === 'V' ? 'vent' : ''} ${open ? 'open' : ''}" data-id="${it.id}">
       <div class="row">
         <div class="codecol">
@@ -408,6 +405,10 @@
         <div class="grid">
           <label class="f"><span>Quantity</span><input inputmode="numeric" pattern="[0-9]*" data-k="qty" value="${esc(it.qty == null ? 1 : it.qty)}"></label>
           <label class="f wide"><span>Remarks</span><textarea data-k="remarks" rows="2" placeholder="Opening side, site conditions…">${esc(it.remarks)}</textarea></label>
+        </div>
+        <div class="sitephotos">
+          <span class="sp-label">Site photos <small>for the installation team (optional)</small></span>
+          <div class="ph-list" data-phlist>${photoTiles(it)}</div>
         </div>
         <div class="dactions">
           <span class="grow"></span>
@@ -451,8 +452,62 @@
     });
     card.querySelector('[data-status]').innerHTML = rowStatus(it);
   }
+  function rowSubText(it) {
+    const n = (it.photos || []).length;
+    return [qtyOf(it) > 1 ? `Qty ${qtyOf(it)}` : '', n ? `📷 ${n} site photo${n === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ');
+  }
+  // ---------- site photos ----------
+  const PH_MARK = { done: ['✓', 'Uploaded'], waiting: ['↑', 'Waiting for internet to upload'], failed: ['!', 'Upload failed, will try again'] };
+  function photoTiles(it) {
+    return (it.photos || []).map((p) => `<span class="ph ${p.status}" data-ph="${p.id}" title="${PH_MARK[p.status][1]}">
+        <img src="${p.thumb}" alt="Site photo"><i>${PH_MARK[p.status][0]}</i><button class="ph-x" data-act="ph-del" title="Remove">✕</button></span>`).join('') +
+      `<label class="ph-add" title="Take or choose photos"><b>📷</b><span>Add photo</span><input type="file" accept="image/*" multiple data-photos hidden></label>`;
+  }
+  function refreshPhotos(it) {
+    const card = $app.querySelector(`.item[data-id="${it.id}"]`);
+    if (!card) return;
+    card.querySelector('[data-phlist]').innerHTML = photoTiles(it);
+    rowSub(card, it);
+  }
+  async function addPhotos(it, files) {
+    if (!job.photoKey) job.photoKey = PHOTOS.randomKey(20);
+    for (const file of files) {
+      try {
+        const { full, thumb } = await PHOTOS.prepare(file);
+        const id = PHOTOS.randomKey(8);
+        (it.photos = it.photos || []).push({ id, path: `${job.photoKey}/${it.id}/${id}.jpg`, thumb, full, status: 'waiting' });
+      } catch (err) { alert(err.message); }
+    }
+    touch(); await saveNow(); refreshPhotos(it);
+    syncPhotos();
+  }
+  // upload every photo still waiting, in every job; runs again when the internet comes back
+  let syncing = false;
+  async function syncPhotos() {
+    if (syncing || !PHOTOS.enabled || !navigator.onLine) return;
+    syncing = true;
+    try {
+      const jobs = await DB.allJobs();
+      for (const j0 of jobs) {
+        const j = job && job.id === j0.id ? job : j0;     // the open job is changed in place
+        let changed = false;
+        for (const it of j.items || []) {
+          for (const p of it.photos || []) {
+            if (p.status === 'done' || !p.full) continue;
+            try { await PHOTOS.upload(p.path, p.full); p.status = 'done'; delete p.full; }
+            catch (err) { p.status = 'failed'; p.error = err.message; }
+            changed = true;
+            if (j === job) refreshPhotos(it);
+          }
+        }
+        if (changed) { if (j === job) { touch(); await saveNow(); } else await DB.putJob(j); }
+      }
+    } finally { syncing = false; }
+  }
+  window.addEventListener('online', syncPhotos);
+  setInterval(syncPhotos, 60000);
   function rowSub(card, it) {
-    card.querySelector('[data-sub]').textContent = qtyOf(it) > 1 ? `Qty ${qtyOf(it)}` : '';
+    card.querySelector('[data-sub]').textContent = rowSubText(it);
   }
 
   // ---------- design key pad ----------
@@ -478,8 +533,7 @@
     document.body.appendChild(box);
     const $ = (sel) => box.querySelector(sel);
     const text = $('[data-kp-text]'), form = $('[data-kp-form]');
-    const draw = () => {};   // no drawing while measuring
-    const set = (v) => { text.value = v; it.design = v; touch(); previewSoon(); updateDesignBtn(it); draw(); };
+    const set = (v) => { text.value = v; it.design = v; touch(); previewSoon(); updateDesignBtn(it); };
 
     function drawKeys() {
       $('[data-kp-keys]').innerHTML = settings.keys.map(([k, t], i) =>
@@ -532,8 +586,8 @@
       if (t('[data-kp-clear]')) return set('');
       if (t('[data-kp-done]')) return closeKeypad();
     });
-    text.addEventListener('input', () => { it.design = text.value; touch(); previewSoon(); updateDesignBtn(it); draw(); });
-    drawKeys(); draw();
+    text.addEventListener('input', () => { it.design = text.value; touch(); previewSoon(); updateDesignBtn(it); });
+    drawKeys();
   }
   function closeKeypad(silent) {
     document.querySelectorAll('.kp-back').forEach((x) => x.remove());
@@ -543,14 +597,7 @@
     const b = $app.querySelector(`.item[data-id="${it.id}"] .design`);
     if (b) { b.innerHTML = designFace(it); b.classList.toggle('empty', !it.design); }
   }
-  // the size a drawing is made to: the approved size, else the least measured
-  function drawSize(it) {
-    if (it.final) return [it.final.w, it.final.h];
-    const r = RULES.check(it, settings.toleranceMm);
-    return [r.w.min, r.h.min];
-  }
   function designFace(it) {
-    // measurement step: the codes only, no drawing
     if (!it.design) return `<span class="dplus">+</span><span>Design</span>`;
     return `<span class="dcode">${esc(it.design)}</span>`;
   }
@@ -590,7 +637,6 @@
         ${it.approved ? `<span class="pill approved">✓ Approved</span>` : r.flagged ? `<span class="pill over">⚠ Over ${settings.toleranceMm} mm</span>` : !r.complete ? `<span class="pill over">Incomplete</span>` : `<span class="pill">Ready</span>`}
       </div>
       <div class="rv-body">
-        ${it.design ? `<div class="rv-draw">${DRAW.svg(it.design, fw, fh)}</div>` : ''}
         <table class="mt">
           <tr><th></th><th>1</th><th>2</th><th>3</th><th>Least</th><th>Diff</th></tr>
           <tr><th>W <small>L·C·R</small></th>${cell(it.w, r.w)}<td class="least">${mm(r.w.min)}</td><td class="${r.wOver ? 'over' : 'ok'}">${mm(r.w.diff)}</td></tr>
@@ -642,16 +688,40 @@
   }
 
   // ================= Production sheet =================
+  // two production sheets: the factory sheet (cutting sizes) and the installation sheet (site photo links)
+  let sheetKind = 'factory';
+  function qrSvg(text) {
+    try { const q = qrcode(0, 'L'); q.addData(text); q.make(); return q.createSvgTag({ cellSize: 2, margin: 0, scalable: true }); }
+    catch (err) { return ''; }
+  }
   function sheetHtml() {
+    const install = sheetKind === 'install';
     const items = job.items.filter((i) => i.approved);
-    const pending = job.items.length - items.length;
     const count = (k) => items.filter((i) => i.type === k).reduce((a, i) => a + qtyOf(i), 0);
     const total = items.reduce((a, i) => a + qtyOf(i), 0);
+    const waiting = items.reduce((a, i) => a + (i.photos || []).filter((p) => p.status !== 'done').length, 0);
+    const cols = install
+      ? ['Code', 'Location', ['Width', 'num'], ['Height', 'num'], ['Qty', 'num'], 'Section', 'Design', 'Colour', 'Glass', 'Remarks']
+      : ['Code', ['Width', 'num'], ['Height', 'num'], ['Qty', 'num'], 'Section', 'Design', 'Colour', 'Glass', 'Remarks', ['Cutting sizes <small>(filled by production)</small>', 'cutth']];
+    const head = cols.map((c) => Array.isArray(c) ? `<th class="${c[1]}">${c[0]}</th>` : `<th>${c}</th>`).join('');
+    const row = (it) => install
+      ? `<tr class="has-sub">
+          <td><b>${esc(it.code)}</b></td><td>${esc(it.location)}</td>
+          <td class="num"><b>${esc(it.final.w)}</b></td><td class="num"><b>${esc(it.final.h)}</b></td><td class="num"><b>${qtyOf(it)}</b></td>
+          <td>${esc(it.section)}</td><td class="sh-design"><b>${esc(it.design)}</b></td><td>${esc(it.colour)}</td><td>${esc(it.glass)}</td><td>${esc(it.remarks)}</td>
+        </tr>
+        <tr class="phrow"><td colspan="${cols.length}">${photoLine(it)}</td></tr>`
+      : `<tr>
+          <td><b>${esc(it.code)}</b></td>
+          <td class="num"><b>${esc(it.final.w)}</b></td><td class="num"><b>${esc(it.final.h)}</b></td><td class="num"><b>${qtyOf(it)}</b></td>
+          <td>${esc(it.section)}</td><td class="sh-design"><b>${esc(it.design)}</b></td><td>${esc(it.colour)}</td><td>${esc(it.glass)}</td><td>${esc(it.remarks)}</td>
+          <td class="cut"><div class="cutboxes"><span></span><span></span><span></span><span></span></div></td>
+        </tr>`;
     return `
-
-      <article class="sheet">
+      ${install && waiting ? `<p class="warn noprint">${waiting} site photo${waiting === 1 ? ' is' : 's are'} still waiting to upload from the measuring phone. Their links appear here once uploaded.</p>` : ''}
+      <article class="sheet ${install ? 'install' : ''}">
         <header class="sh-head">
-          <div class="sh-co"><img src="assets/titans_logo_trim.png" alt=""><div><b>${esc(C.company)}</b><span>PRODUCTION SHEET</span></div></div>
+          <div class="sh-co"><img src="assets/titans_logo_trim.png" alt=""><div><b>${esc(C.company)}</b><span>${install ? 'INSTALLATION SHEET' : 'PRODUCTION SHEET'}</span></div></div>
           <table class="sh-info">
             <tr><th>Job no</th><td>${esc(job.no)}</td><th>Date</th><td>${fmtDate(job.date)}</td></tr>
             <tr><th>Customer</th><td>${esc(job.customer)}</td><th>Phone</th><td>${esc(job.phone)}</td></tr>
@@ -660,23 +730,26 @@
           </table>
         </header>
         <table class="sh-table">
-          <thead><tr><th>Code</th><th class="num">Width</th><th class="num">Height</th><th class="num">Qty</th><th>Section</th><th>Design</th><th>Colour</th><th>Glass</th><th>Remarks</th><th class="cutth">Cutting sizes <small>(filled by production)</small></th></tr></thead>
-          <tbody>
-            ${items.map((it, i) => `<tr>
-              <td><b>${esc(it.code)}</b></td>
-              <td class="num"><b>${esc(it.final.w)}</b></td><td class="num"><b>${esc(it.final.h)}</b></td><td class="num"><b>${qtyOf(it)}</b></td>
-              <td>${esc(it.section)}</td>
-              <td class="sh-design">${it.design ? DRAW.svg(it.design, it.final.w, it.final.h, { cls: 'shsvg' }) : ''}<span>${esc(it.design)}</span></td><td>${esc(it.colour)}</td><td>${esc(it.glass)}</td><td>${esc(it.remarks)}</td>
-              <td class="cut"><div class="cutboxes"><span></span><span></span><span></span><span></span></div></td>
-            </tr>`).join('') || `<tr><td colspan="10" class="empty">No approved items yet.</td></tr>`}
-          </tbody>
+          <thead><tr>${head}</tr></thead>
+          <tbody>${items.map(row).join('') || `<tr><td colspan="${cols.length}" class="empty">No approved items yet.</td></tr>`}</tbody>
         </table>
         <footer class="sh-foot">
           <span>Total quantity: <b>${total}</b> (${C.types.map((t) => `${esc(t.label)}s ${count(t.key)}`).join(', ')}) · All sizes in mm</span>
           <span>Approved ${items.length ? fmtDate(items.map((i) => i.approvedAt).sort().pop()) : ''}</span>
         </footer>
-        <div class="sh-sign"><div>Measured by</div><div>Approved by</div><div>Production in-charge</div></div>
+        <div class="sh-sign">${install ? '<div>Installed by</div><div>Customer signature</div><div>Date of installation</div>' : '<div>Measured by</div><div>Approved by</div><div>Production in-charge</div>'}</div>
       </article>`;
+  }
+  // under each window on the installation sheet: the link (and QR code) to its site photos
+  function photoLine(it) {
+    const photos = it.photos || [];
+    const done = photos.filter((p) => p.status === 'done').length;
+    if (!photos.length) return `<span class="ph-none">No site photos</span>`;
+    const link = PHOTOS.galleryLink(job, it);
+    if (!link) return `<span class="ph-none">${photos.length} site photo${photos.length === 1 ? '' : 's'} not uploaded yet</span>`;
+    return `<div class="ph-link">${qrSvg(link)}<div><b>📷 Site photos of ${esc(it.code)} (${done})</b>
+      <a href="${esc(link)}" target="_blank" rel="noopener">${esc(link.replace(/^https?:\/\//, '').slice(0, 70))}…</a>
+      <small>Scan the code or tap the link to see the photos taken at site.</small></div></div>`;
   }
 
   function steps(cur) {
@@ -799,6 +872,7 @@
     if (el.matches('[data-import]')) return importBackup(el.files[0]);
     if (!job) return;
     const it = itemOf(el);
+    if (el.matches('[data-photos]') && it && el.files.length) { await addPhotos(it, [...el.files]); return; }
     if (el.value === '__other' && it && LISTS[el.dataset.k]) {
       const [listKey, label] = LISTS[el.dataset.k];
       const v = (prompt(`Type the ${label.toLowerCase()}:`) || '').trim();
@@ -851,6 +925,14 @@
       if (j >= 0 && j < job.items.length) { [job.items[i], job.items[j]] = [job.items[j], job.items[i]]; touch(); viewWork(); }
     }
     if (act === 'keypad' && it) openKeypad(it);
+    if (act === 'kind') { sheetKind = b.dataset.k; showPane(); }
+    if (act === 'ph-del' && it) {
+      e.preventDefault();
+      const id = b.closest('[data-ph]').dataset.ph;
+      if (confirm('Remove this photo? It will no longer be on the installation sheet.')) {
+        it.photos = (it.photos || []).filter((p) => p.id !== id); touch(); refreshPhotos(it);
+      }
+    }
     if (act === 'more' && it) {
       const card = b.closest('.item'), open = !openRows.has(it.id);
       open ? openRows.add(it.id) : openRows.delete(it.id);
@@ -955,9 +1037,13 @@
   (async function start() {
     const s = await DB.get('settings');
     if (s) settings = Object.assign(settings, s, { defaults: Object.assign({}, settings.defaults, s.defaults || {}) });
+    // the first key pad (SL, OP, TH, BH, FIX, VENT, FAN, MESH, ...) is replaced by the real codes, unless it was changed by hand
+    const OLD_KEYS = 'SL,OP,TH,BH,FIX,VENT,FAN,MESH,DOOR,LOUV,T&T,ARCH';
+    if (s && s.keys && s.keys.map((k) => k[0]).join(',') === OLD_KEYS) { settings.keys = C.designKeys.map((x) => x.slice()); DB.set('settings', settings); }
     if (!settings.glass.includes('5 mm Pinned')) settings.glass.splice(1, 0, '5 mm Pinned');
     fillLists();
     document.getElementById('ver').textContent = 'Version ' + C.version;
+    setTimeout(syncPhotos, 1500);
     route();
   })();
 })();

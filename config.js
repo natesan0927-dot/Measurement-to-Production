@@ -3,9 +3,15 @@
  * (The tolerance and the suggestion lists can also be changed in the app, under Settings.)
  */
 window.CONFIG = {
-  version: '1.11 · 18-11-2026',   // shown in the sidebar and Settings, to see which version is open
+  version: '1.12 · 19-11-2026',   // shown in the sidebar and Settings, to see which version is open
   company: 'TITANS WINDOWS',
-  jobPrefix: 'M2P-',            // job numbers: M2P-0001, M2P-0002, ...
+  jobPrefix: 'M2P-',
+
+  // Online storage for site photos (the same Supabase project as the quotation software).
+  // One-time setup: run supabase/m2p-photos.sql in Supabase -> SQL Editor.
+  supabaseUrl: 'https://hlfwltdulofupxxpedjp.supabase.co',
+  supabaseKey: 'sb_publishable_nTPQID--zReOWkxBoMVBcA_SqFGB3wu',
+  photoBucket: 'm2p-photos',            // job numbers: M2P-0001, M2P-0002, ...
 
   // Most a set of three measurements may differ (largest minus smallest) before it is flagged
   toleranceMm: 8,
@@ -16,12 +22,12 @@ window.CONFIG = {
     { key: 'V', label: 'Ventilator', prefix: 'V' },
   ],
 
-  // Keys on the design key pad. Tapping keys builds the design, e.g. "SL SL FIX" or "OP FIX OP".
+  // Keys on the design key pad, the same codes as the quotation software.
+  // Tapping keys builds the design, e.g. "SL SL M" (= SLSLM) or "OP OP" (= OPOP).
   // [key, what it means]
   designKeys: [
-    ['SL', 'Sliding'], ['OP', 'Openable'], ['TH', 'Top hung'], ['BH', 'Bottom hung'],
-    ['FIX', 'Fixed'], ['VENT', 'Ventilator'], ['FAN', 'Exhaust fan'], ['MESH', 'Mosquito mesh'],
-    ['DOOR', 'Door'], ['LOUV', 'Louvers'], ['T&T', 'Tilt & turn'], ['ARCH', 'Arch'],
+    ['SL', 'Sliding shutter'], ['OP', 'Openable shutter'], ['M', 'Mesh shutter'], ['FXD', 'Fixed'],
+    ['DOOR', 'Casement door'], ['FXLUV', 'Fixed louvered vent'], ['LUVF', 'Vent with fan'], ['TH', 'Top hung'],
   ],
   // What a new item starts with (can be changed on each item, and here under Settings in the app)
   defaults: {

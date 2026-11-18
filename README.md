@@ -14,13 +14,15 @@ On a phone, open it and choose *Add to Home screen* to install it as an app.
    - **Design** opens a key pad: tap SL, OP, TH, BH, FIX, VENT, FAN, MESH, DOOR … to draft it (e.g. `SL SL MESH`, `OP FIX OP`).
      New codes can be added right in the key pad (**+ New code**), and **✎ Edit codes** changes or deletes them.
      They can also be managed under Settings.
-   - **Design drawing**: the design codes are drawn as a window to its width × height (sliding arrows,
-     opening triangles, fixed panes, fan, mesh, arch), on the approval and the production sheet (not while measuring).
+   - **Design codes** are the same as the quotation software: SL, OP, M (mesh), FXD, DOOR, FXLUV, LUVF, TH…
+     ("SL SL M" = SLSLM). The design is shown as its codes only; no window drawings anywhere.
    - **Location, colour, glass and section** are always shown under the measurements.
      Section: **Inventa** for a window, **Optima** for a ventilator as standard. A new item starts as **White**,
      with **5 mm Clear** glass for a window and **5 mm Pinned** for a ventilator; pick another from the list (locations: Hall, Kitchen, Master bedroom, …),
      or **Other…** to type a new one (it is then kept in the list). The starting colour and glass, and the location / colour / glass lists, can be changed under Settings.
-   - **⋯** opens the rest: quantity, remarks, type, move and delete.
+   - **⋯** opens the rest: quantity, remarks, **site photos**, type, move and delete.
+     Site photos (optional, for the installation team) are kept on the phone and uploaded to Supabase as soon
+     as there is internet: ↑ waiting, ✓ uploaded.
 
    Under each line the least size and the difference show straight away; the least boxes turn yellow
    and a set that differs by more than 8 mm turns red.
@@ -41,6 +43,15 @@ when the one before is done (the sidebar shows them, locked until then).
    with **4 empty boxes per window for the cutting sizes** the production team works out and writes in by hand, and the total quantity,
    ready to print or save as PDF (A4 landscape) for the factory.
 
+**Two production sheets** (switch at the top of step 3):
+- **Factory sheet**: code, size, qty, section, design, colour, glass, remarks and 4 large boxes per window
+  for the cutting sizes, written in by hand.
+- **Installation sheet**: the same plus location, and under each window a **link and QR code to its site photos**.
+  Installers open it on any phone with no login (`photos.html`).
+
+**One-time Supabase setup for site photos:** open the quotation software's Supabase project → SQL Editor →
+New query → paste `supabase/m2p-photos.sql` → Run. Until then photos stay on the phone with ↑ (waiting).
+
 **Left sidebar** (on a PC, like the quotation software): Jobs, New job, the open job with its three stages
 (Measurement, Review & approve, Production sheet: the current one highlighted, with counts) and Settings.
 
@@ -57,9 +68,10 @@ as an app on a phone ("Add to Home screen"). Use *Settings → Download backup* 
 |---|---|
 | `index.html` | The page |
 | `app.js` | The screens: jobs, measurement, review & approve, production sheet, settings |
-| `drawing.js` | Draws a window from its design codes |
 | `rules.js` | The measurement rules (least size, 8 mm difference check) |
 | `config.js` | Company name, job number prefix, 8 mm limit, design and glass lists |
+| `photos.js`, `photos.html` | Site photos: upload to Supabase, and the page installers open from the link |
+| `vendor/qrcode.js` | QR codes on the installation sheet (MIT licence, by Kazuhiko Arase) |
 | `db.js` | Saving on the device |
 | `style.css` | Look of the app and the printed sheet |
 | `sw.js`, `manifest.webmanifest` | Installable app, works offline |
