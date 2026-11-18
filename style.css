@@ -614,3 +614,7 @@ button.stat:hover { transform: translateY(-2px); border-color: var(--border-stro
 .final-in input { background: #E8EDFF; border: 2px solid var(--navy-600); color: var(--navy-800); }
 .final-in input:focus { border-color: var(--navy-800); box-shadow: 0 0 0 4px rgba(36,48,133,.18); }
 .final-in input:disabled { background: var(--good-bg); border-color: var(--good); color: var(--good); }
+
+/* approval table: the least of the three stays yellow; the Least row below has its own look (navy, gold) */
+.mt.vert tr.sum td.least { background: var(--navy-800); color: var(--gold-300); font-weight: 700; }
+.mt.vert tr.sum:first-of-type th { background: var(--navy-800); color: #fff; }
