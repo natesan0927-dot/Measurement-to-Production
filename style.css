@@ -559,3 +559,12 @@ button.stat:hover { transform: translateY(-2px); border-color: var(--border-stro
   .ph-link svg { width: 22mm; height: 22mm; }
   .sh-table tr.has-sub, .sh-table tr.phrow { break-inside: avoid; }
 }
+
+/* approval: measurements one under another, W and H side by side */
+.mt.vert { flex: 0 1 300px; }
+.mt.vert th:first-child { width: 58px; text-align: left; padding-left: 10px; }
+.mt.vert tr:first-child th { font: 700 14px var(--display); color: var(--navy-800); }
+.mt.vert td { width: 42%; padding: 7px 8px; }
+.mt.vert tr.sum th, .mt.vert tr.sum td { border-top: 2px solid var(--border-strong); }
+.mt.vert tr.sum + tr.sum th, .mt.vert tr.sum + tr.sum td { border-top-width: 1px; }
+@media (max-width: 640px) { .mt.vert { flex-basis: 100%; } }

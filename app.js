@@ -624,11 +624,12 @@
   }
   function reviewCard(it, r) {
     const fw = it.final ? it.final.w : r.w.min, fh = it.final ? it.final.h : r.h.min;
-    const cell = (arr, s) => arr.map((v) => {
+    // one measurement box, coloured like on the measurement page: least yellow, missing red
+    const cell = (v, st) => {
       const n = Number(v);
-      const cls = v === '' ? 'miss' : n === s.min ? 'least' : n === s.max && s.diff ? 'most' : '';
+      const cls = v === '' ? 'miss' : n === st.min ? 'least' : n === st.max && st.diff ? 'most' : '';
       return `<td class="${cls}">${v === '' ? '–' : esc(v)}</td>`;
-    }).join('');
+    };
     const cls = it.approved ? 'approved' : r.flagged || !r.complete ? 'flagged' : '';
     return `<section class="card rv ${cls}" data-id="${it.id}">
       <div class="rv-head">
@@ -637,10 +638,11 @@
         ${it.approved ? `<span class="pill approved">✓ Approved</span>` : r.flagged ? `<span class="pill over">⚠ Over ${settings.toleranceMm} mm</span>` : !r.complete ? `<span class="pill over">Incomplete</span>` : `<span class="pill">Ready</span>`}
       </div>
       <div class="rv-body">
-        <table class="mt">
-          <tr><th></th><th>1</th><th>2</th><th>3</th><th>Least</th><th>Diff</th></tr>
-          <tr><th>W</th>${cell(it.w, r.w)}<td class="least">${mm(r.w.min)}</td><td class="${r.wOver ? 'over' : 'ok'}">${mm(r.w.diff)}</td></tr>
-          <tr><th>H</th>${cell(it.h, r.h)}<td class="least">${mm(r.h.min)}</td><td class="${r.hOver ? 'over' : 'ok'}">${mm(r.h.diff)}</td></tr>
+        <table class="mt vert">
+          <tr><th></th><th>W</th><th>H</th></tr>
+          ${[0, 1, 2].map((i) => `<tr><th></th>${cell(it.w[i], r.w)}${cell(it.h[i], r.h)}</tr>`).join('')}
+          <tr class="sum"><th>Least</th><td class="least">${mm(r.w.min)}</td><td class="least">${mm(r.h.min)}</td></tr>
+          <tr class="sum"><th>Diff</th><td class="${r.wOver ? 'over' : 'ok'}">${mm(r.w.diff)}</td><td class="${r.hOver ? 'over' : 'ok'}">${mm(r.h.diff)}</td></tr>
         </table>
         <div class="final">
           <span>Production size (mm)</span>
