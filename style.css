@@ -135,7 +135,7 @@ textarea { resize: vertical; }
 
 /* ---------- design key pad ---------- */
 .kp-back { position: fixed; inset: 0; z-index: 50; background: rgba(4,8,26,.45); display: flex; align-items: flex-end; justify-content: center; }
-.keypad { width: 100%; max-width: 560px; background: var(--surface); border-radius: 16px 16px 0 0; padding: 14px 14px max(14px, env(safe-area-inset-bottom)); box-shadow: 0 -10px 30px -10px rgba(0,0,0,.4); }
+.keypad { width: 100%; max-width: 560px; max-height: 92vh; overflow: auto; background: var(--surface); border-radius: 16px 16px 0 0; padding: 14px 14px max(14px, env(safe-area-inset-bottom)); box-shadow: 0 -10px 30px -10px rgba(0,0,0,.4); }
 .kp-top { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .kp-top b { white-space: nowrap; font: 700 15px var(--display); color: var(--navy-800); }
 .kp-top input { font: 700 17px var(--display); letter-spacing: .04em; }
@@ -144,6 +144,17 @@ textarea { resize: vertical; }
 .kp-keys button:active { background: var(--navy-800); color: var(--gold-300); }
 .kp-keys b { font: 700 17px var(--display); }
 .kp-keys small { font-size: 10.5px; color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.kp-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: -4px 0 8px; font-size: 12.5px; }
+.kp-keys button.editing { border-style: dashed; border-color: var(--gold-600); }
+.kp-keys button.sel { background: var(--hl); border: 2px solid var(--gold); }
+.kp-keys button.add { border-style: dashed; background: var(--surface); }
+.kp-keys button.add b { color: var(--gold-600); }
+.kp-form { display: grid; grid-template-columns: 110px 1fr; gap: 8px; margin-top: 12px; padding: 12px; border-radius: var(--r-sm); background: var(--surface-2); border: 1px solid var(--border); }
+.kp-form input[data-kf-k] { text-transform: uppercase; font: 700 16px var(--display); }
+.kp-form-act { grid-column: 1 / -1; display: flex; gap: 8px; }
+.keylist { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 8px; max-width: 520px; }
+.keyrow { display: grid; grid-template-columns: 100px 1fr 34px; gap: 6px; align-items: center; }
+.keyrow [data-key-k] { text-transform: uppercase; font: 700 15px var(--display); }
 .kp-act { display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 8px; margin-top: 12px; }
 
 .addbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }

@@ -12,7 +12,8 @@ On a phone, open it and choose *Add to Home screen* to install it as an app.
 2. **Measurement** – add a **Window** (W1, W2, …) or **Ventilator** (V1, V2, …). The code continues by itself and can be changed.
    Each item is **one line**: code | 3 widths (**left, centre, right**) | 3 heights (**top, middle, bottom**) | design.
    - **Design** opens a key pad: tap SL, OP, TH, BH, FIX, VENT, FAN, MESH, DOOR … to draft it (e.g. `SL SL MESH`, `OP FIX OP`).
-     The keys can be changed under Settings.
+     New codes can be added right in the key pad (**+ New code**), and **✎ Edit codes** changes or deletes them.
+     They can also be managed under Settings.
    - **⋯** opens the rest: location, quantity, colour (a new item starts with the colour of the one before),
      glass specification, remarks, photo, type, move and delete.
 

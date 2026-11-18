@@ -325,29 +325,83 @@
   }
 
   // ---------- design key pad ----------
+  // Tap keys to draft the design. "Edit codes" lets the codes themselves be added, changed or removed here.
   let kpItem = null;
   function openKeypad(it) {
-    kpItem = it;
     closeKeypad(true);
+    kpItem = it;
+    let editing = false, editIdx = null;   // editIdx: index of the code being changed, -1 for a new one
     const box = document.createElement('div');
     box.className = 'kp-back';
     box.innerHTML = `<div class="keypad" role="dialog" aria-label="Design">
-      <div class="kp-top"><b>${esc(it.code)} design</b><input data-kp-text value="${esc(it.design)}" placeholder="Tap the keys below"></div>
-      <div class="kp-keys">${settings.keys.map(([k, t]) => `<button data-kp="${esc(k)}" title="${esc(t)}"><b>${esc(k)}</b><small>${esc(t)}</small></button>`).join('')}</div>
-      <div class="kp-act"><button class="btn" data-kp-back>⌫ Back</button><button class="btn ghost" data-kp-clear>Clear</button><button class="btn gold" data-kp-done>Done</button></div>
+      <div class="kp-top"><b>${esc(it.code)} design</b><input data-kp-text value="${esc(it.design)}" placeholder="Tap the codes below"></div>
+      <div class="kp-bar"><span class="muted" data-kp-hint>Tap codes to build the design</span><button class="btn small ghost" data-kp-edit>✎ Edit codes</button></div>
+      <div class="kp-keys" data-kp-keys></div>
+      <div class="kp-form" data-kp-form hidden>
+        <label class="f"><span>Code</span><input data-kf-k maxlength="8" placeholder="e.g. SLM"></label>
+        <label class="f"><span>What it means</span><input data-kf-t placeholder="e.g. Sliding with mesh"></label>
+        <div class="kp-form-act"><button class="btn small ghost danger" data-kf-del>Delete</button><span class="grow"></span><button class="btn small ghost" data-kf-cancel>Cancel</button><button class="btn small gold" data-kf-save>Save code</button></div>
+      </div>
+      <div class="kp-act" data-kp-act><button class="btn" data-kp-back>⌫ Back</button><button class="btn ghost" data-kp-clear>Clear</button><button class="btn gold" data-kp-done>Done</button></div>
     </div>`;
     document.body.appendChild(box);
-    const text = box.querySelector('[data-kp-text]');
+    const $ = (sel) => box.querySelector(sel);
+    const text = $('[data-kp-text]'), form = $('[data-kp-form]');
     const set = (v) => { text.value = v; it.design = v; touch(); previewSoon(); updateDesignBtn(it); };
-    box.addEventListener('click', (e) => {
+
+    function drawKeys() {
+      $('[data-kp-keys]').innerHTML = settings.keys.map(([k, t], i) =>
+        `<button data-kp="${i}" class="${editing ? 'editing' : ''} ${editIdx === i ? 'sel' : ''}" title="${esc(t)}"><b>${esc(k)}</b><small>${esc(t)}</small></button>`).join('') +
+        `<button class="add" data-kp-new><b>+</b><small>New code</small></button>`;
+      $('[data-kp-edit]').textContent = editing ? '✓ Finished editing' : '✎ Edit codes';
+      $('[data-kp-hint]').textContent = editing ? 'Tap a code to change or delete it' : 'Tap codes to build the design';
+      $('[data-kp-act]').hidden = editing && editIdx !== null;
+    }
+    function openForm(i) {
+      editIdx = i;
+      const [k, t] = i >= 0 ? settings.keys[i] : ['', ''];
+      $('[data-kf-k]').value = k; $('[data-kf-t]').value = t;
+      $('[data-kf-del]').hidden = i < 0;
+      form.hidden = false; drawKeys();
+      $('[data-kf-k]').focus();
+    }
+    function closeForm() { editIdx = null; form.hidden = true; drawKeys(); }
+    async function persist() { await DB.set('settings', settings); }
+
+    box.addEventListener('click', async (e) => {
       if (e.target === box) return closeKeypad();
-      const k = e.target.closest('[data-kp]');
-      if (k) return set((text.value.trim() + ' ' + k.dataset.kp).trim());
-      if (e.target.closest('[data-kp-back]')) return set(text.value.trim().split(/\s+/).slice(0, -1).join(' '));
-      if (e.target.closest('[data-kp-clear]')) return set('');
-      if (e.target.closest('[data-kp-done]')) return closeKeypad();
+      const t = (sel) => e.target.closest(sel);
+      if (t('[data-kp-edit]')) { editing = !editing; return closeForm(); }
+      if (t('[data-kp-new]')) { editing = true; return openForm(-1); }
+      const k = t('[data-kp]');
+      if (k) {
+        const i = Number(k.dataset.kp);
+        if (editing) return openForm(i);
+        return set((text.value.trim() + ' ' + settings.keys[i][0]).trim());
+      }
+      if (t('[data-kf-cancel]')) return closeForm();
+      if (t('[data-kf-save]')) {
+        const code = $('[data-kf-k]').value.trim().toUpperCase().replace(/\s+/g, '');
+        const mean = $('[data-kf-t]').value.trim();
+        if (!code) return alert('Type the code, e.g. SLM');
+        const clash = settings.keys.findIndex(([x]) => x === code);
+        if (clash >= 0 && clash !== editIdx) return alert(`${code} is already a code.`);
+        if (editIdx >= 0) settings.keys[editIdx] = [code, mean]; else settings.keys.push([code, mean]);
+        await persist(); toast(`Code ${code} saved`);
+        return closeForm();
+      }
+      if (t('[data-kf-del]') && editIdx >= 0) {
+        const [code] = settings.keys[editIdx];
+        if (!confirm(`Delete the code ${code}? Designs already typed with it stay as they are.`)) return;
+        settings.keys.splice(editIdx, 1); await persist(); toast(`Code ${code} deleted`);
+        return closeForm();
+      }
+      if (t('[data-kp-back]')) return set(text.value.trim().split(/\s+/).slice(0, -1).join(' '));
+      if (t('[data-kp-clear]')) return set('');
+      if (t('[data-kp-done]')) return closeKeypad();
     });
     text.addEventListener('input', () => { it.design = text.value; touch(); previewSoon(); updateDesignBtn(it); });
+    drawKeys();
   }
   function closeKeypad(silent) {
     document.querySelectorAll('.kp-back').forEach((x) => x.remove());
@@ -489,7 +543,10 @@
       <div class="head"><div><h1>Settings</h1><p class="sub">Saved on this device.</p></div></div>
       <section class="card">
         <label class="f"><span>Most allowed difference between the 3 measurements (mm)</span><input inputmode="numeric" data-set="toleranceMm" value="${settings.toleranceMm}"></label>
-        <label class="f"><span>Design keys (one per line: KEY = what it means)</span><textarea rows="10" data-set="keys">${esc(settings.keys.map(([k, t]) => `${k} = ${t}`).join('\n'))}</textarea></label>
+        <div class="f"><span>Design codes (the keys on the design key pad)</span>
+          <div class="keylist" data-keylist>${settings.keys.map(([k, t]) => keyRow(k, t)).join('')}</div>
+          <div><button class="btn small" data-act="key-add">+ Add code</button></div>
+        </div>
         <label class="f"><span>Glass suggestions (one per line)</span><textarea rows="8" data-set="glass">${esc(settings.glass.join('\n'))}</textarea></label>
         <label class="f"><span>Colour suggestions (one per line)</span><textarea rows="6" data-set="colours">${esc(settings.colours.join('\n'))}</textarea></label>
         <div class="actions"><button class="btn gold" data-act="save-settings">Save settings</button></div>
@@ -502,6 +559,10 @@
           <label class="btn ghost">Restore from backup<input type="file" accept="application/json,.json" data-import hidden></label>
         </div>
       </section>`;
+  }
+
+  function keyRow(k = '', t = '') {
+    return `<div class="keyrow"><input data-key-k value="${esc(k)}" maxlength="8" placeholder="Code" aria-label="Code"><input data-key-t value="${esc(t)}" placeholder="What it means" aria-label="What it means"><button class="icon danger" data-act="key-del" title="Delete">✕</button></div>`;
   }
 
   // ---------- photo ----------
@@ -654,6 +715,11 @@
     if (act === 'print') { tab = 'sheet'; renderPreview(); }
     if (act === 'print') window.print();
     if (act === 'save-settings') saveSettings();
+    if (act === 'key-add') {
+      document.querySelector('[data-keylist]').insertAdjacentHTML('beforeend', keyRow());
+      document.querySelector('.keyrow:last-child [data-key-k]').focus();
+    }
+    if (act === 'key-del') b.closest('.keyrow').remove();
     if (act === 'export') exportBackup();
   });
 
@@ -663,7 +729,11 @@
     const tol = Number(get('toleranceMm'));
     if (!(tol >= 0)) return alert('Enter the difference in mm.');
     const lines = (s) => s.split('\n').map((x) => x.trim()).filter(Boolean);
-    const keys = lines(get('keys')).map((l) => { const [k, ...t] = l.split('='); return [k.trim().toUpperCase(), t.join('=').trim()]; }).filter(([k]) => k);
+    const keys = [...document.querySelectorAll('.keyrow')]
+      .map((r) => [r.querySelector('[data-key-k]').value.trim().toUpperCase().replace(/\s+/g, ''), r.querySelector('[data-key-t]').value.trim()])
+      .filter(([k]) => k);
+    const seen = new Set(), twice = keys.filter(([k]) => (seen.has(k) ? true : (seen.add(k), false))).map(([k]) => k);
+    if (twice.length) return alert('These codes are there twice: ' + twice.join(', '));
     settings = { toleranceMm: tol, keys, glass: lines(get('glass')), colours: lines(get('colours')) };
     await DB.set('settings', settings); fillLists(); toast('Settings saved');
   }
