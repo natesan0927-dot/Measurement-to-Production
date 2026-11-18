@@ -593,3 +593,14 @@ button.stat:hover { transform: translateY(-2px); border-color: var(--border-stro
 @media (min-width: 1200px) { .rv-info { grid-template-columns: repeat(3, minmax(0, 1fr)); } .rv-info > div:nth-child(2n) { border-right: 1px solid var(--border); } .rv-info > div:nth-child(3n) { border-right: 0; } }
 @media (max-width: 640px) { .rv-info { flex-basis: 100%; } }
 @media (min-width: 1200px) { .rv-info > div:nth-child(7) { grid-column: span 2; border-right: 0; } }
+
+/* a clear line between windows on the production sheets (screen and print) */
+.sh-table tbody tr td { border-bottom: 1.5px solid #9AA1BC; }
+.sh-table tbody tr.has-sub td { border-bottom: 0; }
+.sh-table tbody tr.phrow td { border-bottom: 1.5px solid #9AA1BC; }
+.sh-table tbody tr:last-child td { border-bottom: 2px solid var(--navy-800); }
+@media print {
+  .sh-table tbody tr td { border-bottom: 0.4mm solid #444 !important; }
+  .sh-table tbody tr.has-sub td { border-bottom: 0 !important; }
+  .sh-table tbody tr:last-child td { border-bottom: 0.6mm solid #000 !important; }
+}
