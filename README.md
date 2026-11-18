@@ -14,23 +14,28 @@ On a phone, open it and choose *Add to Home screen* to install it as an app.
    - **Design** opens a key pad: tap SL, OP, TH, BH, FIX, VENT, FAN, MESH, DOOR … to draft it (e.g. `SL SL MESH`, `OP FIX OP`).
      New codes can be added right in the key pad (**+ New code**), and **✎ Edit codes** changes or deletes them.
      They can also be managed under Settings.
+   - **Design drawing**: the design codes are drawn as a window to its width × height (sliding arrows,
+     opening triangles, fixed panes, fan, mesh, arch), on the measurement, the approval and the production sheet.
    - **Location, colour and glass** are always shown under the measurements. A new item starts as **White**,
-     with **5 mm Clear** glass for a window and **5 mm Pinned** for a ventilator; pick another from the list,
-     or **Other…** to type a new one (it is then kept in the list). The starting colour and glass can be changed under Settings.
+     with **5 mm Clear** glass for a window and **5 mm Pinned** for a ventilator; pick another from the list (locations: Hall, Kitchen, Master bedroom, …),
+     or **Other…** to type a new one (it is then kept in the list). The starting colour and glass, and the location / colour / glass lists, can be changed under Settings.
    - **⋯** opens the rest: quantity, remarks, photo, type, move and delete.
 
    Under each line the least size and the difference show straight away; the least boxes turn yellow
    and a set that differs by more than 8 mm turns red.
    Everything saves by itself while typing.
-**Side by side:** on a PC or tablet the measurements are on the left and the review / production sheet on the right,
-updating as you type (like the quotation software). On a phone they are shown one at a time.
+**One step at a time:** the job goes through three steps, each on its own page. The next step opens only
+when the one before is done (the sidebar shows them, locked until then).
 
-3. **Review & approve** – *Proceed to production sheet* shows every item with its 3+3 measurements.
+   When all windows are measured, **Mark complete & proceed** saves and opens the approval
+   (it only goes ahead when every item has all 3 widths and 3 heights).
+3. **Approval** – shows every item with its 3+3 measurements.
    - The **least width and least height** are highlighted and offered as the production size.
    - If the measurements differ by **more than 8 mm** (largest − smallest), the item is shown in red. It can still be approved with one tap.
    - The production size can be edited in place before approving.
    - *Approve all within 8 mm* approves every item that is complete and within the limit.
    - If a measurement is changed later, that item's approval is dropped and it has to be approved again.
+   - **Generate production sheet** opens only when every item is approved.
 4. **Production sheet** – lists the approved items: code, final width × height, quantity, design, colour, glass and remarks,
    with **4 empty boxes per window for the cutting sizes** the production team works out and writes in by hand, and the total quantity,
    ready to print or save as PDF (A4 landscape) for the factory.
@@ -51,6 +56,7 @@ as an app on a phone ("Add to Home screen"). Use *Settings → Download backup* 
 |---|---|
 | `index.html` | The page |
 | `app.js` | The screens: jobs, measurement, review & approve, production sheet, settings |
+| `drawing.js` | Draws a window from its design codes |
 | `rules.js` | The measurement rules (least size, 8 mm difference check) |
 | `config.js` | Company name, job number prefix, 8 mm limit, design and glass lists |
 | `db.js` | Saving on the device |

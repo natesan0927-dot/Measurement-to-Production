@@ -27,6 +27,10 @@ window.CONFIG = {
     colour: 'White',
     glass: { W: '5 mm Clear', V: '5 mm Pinned' },   // windows / ventilators
   },
+  locations: [
+    'Hall', 'Living', 'Dining', 'Kitchen', 'Master bedroom', 'Bedroom 2', 'Bedroom 3', 'Kids bedroom',
+    'Bathroom', 'Toilet', 'Pooja', 'Study', 'Balcony', 'Staircase', 'Utility', 'Store', 'Guest bedroom',
+  ],
   colours: [
     'White', 'Ivory', 'Golden Oak', 'Walnut', 'Mahogany', 'Anthracite Grey', 'Black', 'White inside / Golden Oak outside',
   ],

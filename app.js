@@ -8,7 +8,7 @@
 (function () {
   const C = window.CONFIG;
   const $app = document.getElementById('app');
-  let settings = { toleranceMm: C.toleranceMm, keys: C.designKeys.map((x) => x.slice()), glass: C.glass.slice(), colours: C.colours.slice(),
+  let settings = { toleranceMm: C.toleranceMm, keys: C.designKeys.map((x) => x.slice()), glass: C.glass.slice(), colours: C.colours.slice(), locations: C.locations.slice(),
     defaults: { colour: C.defaults.colour, glass: Object.assign({}, C.defaults.glass) } };
   let job = null;        // the job open right now
   let saveTimer = null;
@@ -17,7 +17,10 @@
   let previewTimer = null;
   let siteOpen = null;           // site details open or folded to one line (null: decide by itself)
   const openRows = new Set();   // rows whose details (location, qty, colour, glass, remarks, photo) are open
-  const wide = () => window.matchMedia('(min-width: 1000px)').matches;
+  // one step at a time on every screen (measurement -> approval -> production sheet)
+  const wide = () => false;
+  const allApproved = (j) => j.items.length > 0 && j.items.every((i) => i.approved);
+  const canReview = (j) => !!j.sentToReview && j.items.length > 0;
 
   // ---------- small helpers ----------
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -118,9 +121,16 @@
     job: '<path d="M3 7h18M3 12h18M3 17h18"/><path d="M7 4v16"/>',
     review: '<path d="M5 12l5 5L20 7"/>',
     sheet: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+    lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
     settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
   };
   const svg = (k) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[k]}</svg>`;
+  function ring(frac) {
+    const r = 17, c = 2 * Math.PI * r;
+    return `<svg class="ring" viewBox="0 0 44 44" aria-label="${Math.round(frac * 100)}% approved"><circle cx="22" cy="22" r="${r}" class="ring-bg"/>
+      <circle cx="22" cy="22" r="${r}" class="ring-fg" stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - frac)}"/>
+      <text x="22" y="26" text-anchor="middle">${Math.round(frac * 100)}%</text></svg>`;
+  }
   let navTimer = null;
   function navSoon() { clearTimeout(navTimer); navTimer = setTimeout(renderNav, 250); }
   async function renderNav() {
@@ -135,15 +145,16 @@
       const over = job.items.filter((i) => RULES.check(i, settings.toleranceMm).flagged && !i.approved).length;
       const pcs = job.items.filter((i) => i.approved).reduce((a, i) => a + qtyOf(i), 0);
       const st = [
-        ['job', 'job', '1 · Measurement', `${n} item${n === 1 ? '' : 's'}`, ''],
-        ['review', 'review', '2 · Review & approve', `${ok} of ${n} approved${over ? ` · ${over} over ${settings.toleranceMm} mm` : ''}`, over ? 'warn' : ok && ok === n ? 'done' : ''],
-        ['sheet', 'sheet', '3 · Production sheet', `${pcs} pcs ready`, ''],
+        ['job', 'job', '1 · Measurement', `${n} item${n === 1 ? '' : 's'}${job.sentToReview ? ' · complete' : ''}`, job.sentToReview ? 'done' : '', true],
+        ['review', 'review', '2 · Approval', canReview(job) ? `${ok} of ${n} approved${over ? ` · ${over} over ${settings.toleranceMm} mm` : ''}` : 'after measurement', over ? 'warn' : allApproved(job) ? 'done' : '', canReview(job)],
+        ['sheet', 'sheet', '3 · Production sheet', allApproved(job) ? `${pcs} pcs ready` : 'after approval', '', allApproved(job)],
       ];
       stages = `<div class="navsec">
         <p class="navlabel">Current job</p>
-        <div class="navjob"><b>${esc(job.no)}</b><span>${esc(job.customer || 'No customer name')}</span></div>
-        ${st.map(([k, ic, label, sub, cls]) => `<a href="#/${k}/${job.id}" class="navitem stage ${cur === k ? 'active' : ''} ${cls}">
-          ${svg(ic)}<span>${label}<small>${sub}</small></span></a>`).join('')}
+        <div class="navjob">${ring(n ? ok / n : 0)}<div><b>${esc(job.no)}</b><span>${esc(job.customer || 'No customer name')}</span></div></div>
+        ${st.map(([k, ic, label, sub, cls, open]) => open
+          ? `<a href="#/${k}/${job.id}" class="navitem stage ${cur === k ? 'active' : ''} ${cls}">${svg(ic)}<span>${label}<small>${sub}</small></span></a>`
+          : `<span class="navitem stage locked" title="Opens ${sub}">${svg('lock')}<span>${label}<small>${sub}</small></span></span>`).join('')}
       </div>`;
     }
     document.getElementById('navlist').innerHTML = `
@@ -166,6 +177,11 @@
     const [view, id] = h.split('/');
     const work = ['job', 'review', 'sheet'].includes(view);
     document.body.dataset.view = work ? 'work' : view || 'home';
+    if (work && job && job.id === id) {
+      // a step can only be opened once the one before it is done
+      if (view === 'review' && !canReview(job)) { toast('Mark the measurements complete first'); location.replace(`#/job/${id}`); return; }
+      if (view === 'sheet' && !allApproved(job)) { toast('Approve every window first'); location.replace(`#/${canReview(job) ? 'review' : 'job'}/${id}`); return; }
+    }
     if (work) {
       pane = view;
       if (view !== 'job') tab = view;
@@ -183,37 +199,80 @@
     siteOpen = null; openRows.clear();
     job.items = job.items || [];
     job.items.forEach(dropStaleApproval);
+    if (view === 'review' && !canReview(job)) { location.replace(`#/job/${id}`); return; }
+    if (view === 'sheet' && !allApproved(job)) { location.replace(`#/${canReview(job) ? 'review' : 'job'}/${id}`); return; }
     if (work) return viewWork();
     location.hash = '#/';
   }
   window.addEventListener('hashchange', route);
 
   // ================= Jobs list =================
+  let homeFilter = 'all';
   async function viewHome() {
     job = null;
     const jobs = (await DB.allJobs()).sort((a, b) => (b.updated || '').localeCompare(a.updated || ''));
+    const count = (st) => jobs.filter((j) => jobStatus(j) === st).length;
+    const pcs = jobs.reduce((a, j) => a + (j.items || []).filter((i) => i.approved).reduce((x, i) => x + qtyOf(i), 0), 0);
+    const hr = new Date().getHours();
+    const hello = hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening';
+    const tiles = [
+      ['all', 'All jobs', jobs.length, ''],
+      ['measuring', 'Measuring', count('measuring'), 'blue'],
+      ['review', 'Waiting approval', count('review'), 'amber'],
+      ['approved', 'Ready for production', count('approved'), 'green'],
+    ];
     $app.innerHTML = `
-      <div class="head">
-        <div><h1>Jobs</h1><p class="sub">Each job is one site visit. Open it to measure, approve and print the production sheet.</p></div>
-        <button class="btn gold" data-act="new-job">+ New job</button>
+      <section class="hero">
+        <svg class="heroart" viewBox="0 0 320 160" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.4">
+          <rect x="10" y="12" width="120" height="136" rx="3"/><line x1="70" y1="12" x2="70" y2="148"/><path d="M40 80h20m-5-4 5 4-5 4M100 80H80m5-4-5 4 5 4"/>
+          <rect x="150" y="12" width="76" height="136" rx="3"/><path d="M156 18 L220 80 L156 142" stroke-dasharray="5 4"/>
+          <rect x="246" y="12" width="64" height="64" rx="3"/><path d="M252 18 L278 70 L304 18" stroke-dasharray="5 4"/>
+          <rect x="246" y="86" width="64" height="62" rx="3"/><circle cx="278" cy="117" r="18"/><circle cx="278" cy="117" r="3"/></g></svg>
+        <div class="hero-text">
+          <p class="eyebrow">Titans Windows · Measurement to Production</p>
+          <h1>${hello}</h1>
+          <p>Measure on site, approve the sizes, and hand the factory a clean production sheet.</p>
+        </div>
+        <button class="btn shine" data-act="new-job">+ New job</button>
+      </section>
+      <div class="stats">
+        ${tiles.map(([k, l, n, c]) => `<button class="stat ${c} ${homeFilter === k ? 'on' : ''}" data-act="filter" data-f="${k}"><b>${n}</b><span>${l}</span></button>`).join('')}
+        <div class="stat gold"><b>${pcs}</b><span>Pieces approved</span></div>
       </div>
-      <input class="search" type="search" placeholder="Search customer, site, job no…" data-search>
-      <div class="joblist">
-        ${jobs.length ? jobs.map(jobRow).join('') : `<div class="empty">No jobs yet. Tap <b>+ New job</b> to start measuring a site.</div>`}
+      <div class="listhead">
+        <h2>${homeFilter === 'all' ? 'Recent jobs' : esc(tiles.find((t) => t[0] === homeFilter)[1])}</h2>
+        <input class="search" type="search" placeholder="Search customer, site, job no…" data-search>
+      </div>
+      <div class="jobgrid">
+        ${jobs.length ? jobs.map(jobCard).join('') : `<div class="empty big">
+            <div class="empty-art">${DRAW.svg('SL SL', 1600, 1200)}</div>
+            <b>No jobs yet</b><span>Tap <b>+ New job</b> to start measuring your first site.</span></div>`}
       </div>`;
+    applyHomeFilter();
   }
-  function jobRow(j) {
-    const n = (j.items || []).length, ok = (j.items || []).filter((i) => i.approved).length;
+  function applyHomeFilter() {
+    const q = (document.querySelector('[data-search]') || {}).value || '';
+    document.querySelectorAll('.jobcard').forEach((c) => {
+      c.hidden = (homeFilter !== 'all' && c.dataset.status !== homeFilter) || (q && !c.dataset.text.includes(q.trim().toLowerCase()));
+    });
+  }
+  function jobCard(j) {
+    const items = j.items || [];
+    const n = items.length, ok = items.filter((i) => i.approved).length;
+    const pct = n ? Math.round((ok / n) * 100) : 0;
     const st = jobStatus(j);
-    return `<a class="jobrow" href="#/job/${j.id}" data-text="${esc([j.no, j.customer, j.site, j.address].join(' ').toLowerCase())}">
-      <div class="jr-main">
-        <b>${esc(j.customer || 'No customer name')}</b>
-        <span>${esc(j.no)} · ${esc(j.site || j.address || '')} · ${fmtDate(j.date)}</span>
-      </div>
-      <div class="jr-side">
-        <span class="pill ${st}">${STATUS[st]}</span>
-        <small>${n} item${n === 1 ? '' : 's'}${n ? ` · ${ok} approved` : ''}</small>
-      </div>
+    const over = items.filter((i) => !i.approved && RULES.check(i, settings.toleranceMm).flagged).length;
+    const thumbs = items.filter((i) => i.design).slice(0, 5).map((i) => {
+      const r = RULES.check(i, settings.toleranceMm);
+      return `<span class="thumb" title="${esc(i.code)} ${esc(i.design)}">${DRAW.svg(i.design, i.final ? i.final.w : r.w.min, i.final ? i.final.h : r.h.min)}</span>`;
+    }).join('');
+    return `<a class="jobcard" href="#/job/${j.id}" data-status="${st}" data-text="${esc([j.no, j.customer, j.site, j.address].join(' ').toLowerCase())}">
+      <div class="jc-top"><span class="jobno">${esc(j.no)}</span><span class="pill ${st}">${STATUS[st]}</span></div>
+      <b class="jc-name">${esc(j.customer || 'No customer name')}</b>
+      <span class="jc-meta">${esc(j.site || j.address || 'Site not set')} · ${fmtDate(j.date)}</span>
+      <div class="jc-thumbs">${thumbs || '<span class="muted">No designs yet</span>'}</div>
+      <div class="bar"><i style="width:${pct}%"></i></div>
+      <div class="jc-foot"><span><b>${ok}</b>/${n} approved</span>${over ? `<span class="warn">⚠ ${over} over ${settings.toleranceMm} mm</span>` : `<span>${items.reduce((a, i) => a + qtyOf(i), 0)} pcs</span>`}</div>
     </a>`;
   }
 
@@ -251,7 +310,7 @@
         </div>
         <aside class="previewcol">
           <div class="previewhead noprint">
-            <div><h2 data-ptitle></h2><small class="muted">Updates as you type</small></div>
+            <div><h2 data-ptitle></h2><small class="muted" data-psub></small></div>
             <span data-paction></span>
           </div>
           <div data-preview></div>
@@ -269,17 +328,20 @@
     ws.dataset.pane = pane;
     $app.querySelector('[data-steps]').innerHTML = steps(pane);
     const show = wide() ? tab : pane;
-    $app.querySelector('[data-ptitle]').textContent = show === 'sheet' ? 'Production sheet' : 'Review & approve';
-    $app.querySelector('[data-paction]').innerHTML = show === 'sheet'
-      ? `<button class="btn gold small" data-act="print">Print / Save PDF</button>`
+    $app.querySelector('[data-ptitle]').textContent = show === 'sheet' ? 'Production sheet' : 'Approve each window';
+    $app.querySelector('[data-psub]').textContent = `${job.no} · ${job.customer || 'No customer name'}` +
+      (show === 'sheet' ? ' · ready for the factory' : ' · check the sizes, then approve');
+    $app.querySelector('[data-paction]').innerHTML = show === 'sheet' ? ''
       : `<button class="btn small" data-act="approve-ok">Approve all within ${settings.toleranceMm} mm</button>`;
     const approved = job.items.filter((i) => i.approved).length;
+    const n = job.items.length;
     const foot = {
       job: `<button class="btn" data-act="save">Save</button>
-            <button class="btn gold" data-act="to-review" ${job.items.length ? '' : 'disabled'}>Proceed to production sheet →</button>`,
+            <button class="btn gold" data-act="to-review" ${n ? '' : 'disabled'}>✓ Mark complete &amp; proceed →</button>`,
       review: `<a class="btn ghost" href="#/job/${job.id}">← Measurements</a>
-            <button class="btn gold" data-act="to-sheet" ${approved ? '' : 'disabled'}>Open production sheet →</button>`,
-      sheet: `<a class="btn ghost" href="#/review/${job.id}">← Review</a>
+            <span class="footnote">${approved} of ${n} approved</span>
+            <button class="btn gold" data-act="to-sheet" ${allApproved(job) ? '' : 'disabled'} title="${allApproved(job) ? '' : 'Approve every window first'}">Generate production sheet →</button>`,
+      sheet: `<a class="btn ghost" href="#/review/${job.id}">← Approval</a>
             <button class="btn gold" data-act="print">Print / Save PDF</button>`,
     };
     // wide screen: measurements are always on the left, so the buttons follow the right-hand tab
@@ -332,10 +394,10 @@
         </div>
         <div class="trio" data-g="w">${mInput('w', 0, 'Width left', it)}${mInput('w', 1, 'Width centre', it)}${mInput('w', 2, 'Width right', it)}</div>
         <div class="trio" data-g="h">${mInput('h', 0, 'Height top', it)}${mInput('h', 1, 'Height middle', it)}${mInput('h', 2, 'Height bottom', it)}</div>
-        <button class="design ${it.design ? '' : 'empty'}" data-act="keypad" title="Design">${it.design ? esc(it.design) : 'Design'}</button>
+        <button class="design ${it.design ? '' : 'empty'}" data-act="keypad" title="Design">${designFace(it)}</button>
       </div>
       <div class="specs">
-        <label class="sf"><span>Location</span><input data-k="location" value="${esc(it.location)}" placeholder="e.g. Hall"></label>
+        <label class="sf"><span>Location</span>${pick('location', it.location, settings.locations)}</label>
         <label class="sf"><span>Colour</span>${pick('colour', it.colour, settings.colours)}</label>
         <label class="sf"><span>Glass</span>${pick('glass', it.glass, settings.glass)}</label>
       </div>
@@ -357,6 +419,8 @@
       </div>
     </section>`;
   }
+  // item field -> [its list in settings, label]
+  const LISTS = { location: ['locations', 'Location'], colour: ['colours', 'Colour'], glass: ['glass', 'Glass'] };
   // a drop-down of the usual choices; "Other…" lets anything else be typed (and keeps it in the list)
   function pick(key, val, list) {
     const all = val && !list.includes(val) ? [val, ...list] : list;
@@ -382,6 +446,7 @@
       const st = r[g], over = g === 'w' ? r.wOver : r.hOver;
       const box = card.querySelector(`[data-g="${g}"]`);
       box.classList.toggle('over', over);
+      box.classList.toggle('ok', st.complete && !over);
       box.querySelectorAll('input').forEach((inp) => inp.classList.toggle('least', st.count > 1 && inp.value !== '' && Number(inp.value) === st.min));
     });
     card.querySelector('[data-status]').innerHTML = rowStatus(it);
@@ -400,7 +465,7 @@
     const box = document.createElement('div');
     box.className = 'kp-back';
     box.innerHTML = `<div class="keypad" role="dialog" aria-label="Design">
-      <div class="kp-top"><b>${esc(it.code)} design</b><input data-kp-text value="${esc(it.design)}" placeholder="Tap the codes below"></div>
+      <div class="kp-top"><div class="kp-draw" data-kp-draw></div><div class="kp-title"><b>${esc(it.code)} design</b><input data-kp-text value="${esc(it.design)}" placeholder="Tap the codes below"></div></div>
       <div class="kp-bar"><span class="muted" data-kp-hint>Tap codes to build the design</span><button class="btn small ghost" data-kp-edit>✎ Edit codes</button></div>
       <div class="kp-keys" data-kp-keys></div>
       <div class="kp-form" data-kp-form hidden>
@@ -413,7 +478,11 @@
     document.body.appendChild(box);
     const $ = (sel) => box.querySelector(sel);
     const text = $('[data-kp-text]'), form = $('[data-kp-form]');
-    const set = (v) => { text.value = v; it.design = v; touch(); previewSoon(); updateDesignBtn(it); };
+    const draw = () => {
+      const [w, h] = drawSize(it);
+      $('[data-kp-draw]').innerHTML = it.design ? DRAW.svg(it.design, w, h) : '<span>Drawing appears here</span>';
+    };
+    const set = (v) => { text.value = v; it.design = v; touch(); previewSoon(); updateDesignBtn(it); draw(); };
 
     function drawKeys() {
       $('[data-kp-keys]').innerHTML = settings.keys.map(([k, t], i) =>
@@ -466,8 +535,8 @@
       if (t('[data-kp-clear]')) return set('');
       if (t('[data-kp-done]')) return closeKeypad();
     });
-    text.addEventListener('input', () => { it.design = text.value; touch(); previewSoon(); updateDesignBtn(it); });
-    drawKeys();
+    text.addEventListener('input', () => { it.design = text.value; touch(); previewSoon(); updateDesignBtn(it); draw(); });
+    drawKeys(); draw();
   }
   function closeKeypad(silent) {
     document.querySelectorAll('.kp-back').forEach((x) => x.remove());
@@ -475,7 +544,18 @@
   }
   function updateDesignBtn(it) {
     const b = $app.querySelector(`.item[data-id="${it.id}"] .design`);
-    if (b) { b.textContent = it.design || 'Design'; b.classList.toggle('empty', !it.design); }
+    if (b) { b.innerHTML = designFace(it); b.classList.toggle('empty', !it.design); }
+  }
+  // the size a drawing is made to: the approved size, else the least measured
+  function drawSize(it) {
+    if (it.final) return [it.final.w, it.final.h];
+    const r = RULES.check(it, settings.toleranceMm);
+    return [r.w.min, r.h.min];
+  }
+  function designFace(it) {
+    if (!it.design) return `<span class="dplus">+</span><span>Design</span>`;
+    const [w, h] = drawSize(it);
+    return `${DRAW.svg(it.design, w, h, { cls: 'dsvg' })}<span class="dcode">${esc(it.design)}</span>`;
   }
 
   // ================= Review & approve =================
@@ -513,6 +593,7 @@
         ${it.approved ? `<span class="pill approved">✓ Approved</span>` : r.flagged ? `<span class="pill over">⚠ Over ${settings.toleranceMm} mm</span>` : !r.complete ? `<span class="pill over">Incomplete</span>` : `<span class="pill">Ready</span>`}
       </div>
       <div class="rv-body">
+        ${it.design ? `<div class="rv-draw">${DRAW.svg(it.design, fw, fh)}</div>` : ''}
         <table class="mt">
           <tr><th></th><th>1</th><th>2</th><th>3</th><th>Least</th><th>Diff</th></tr>
           <tr><th>W <small>L·C·R</small></th>${cell(it.w, r.w)}<td class="least">${mm(r.w.min)}</td><td class="${r.wOver ? 'over' : 'ok'}">${mm(r.w.diff)}</td></tr>
@@ -534,6 +615,25 @@
       ${it.glass || it.remarks ? `<p class="rv-note">${it.glass ? `<b>Glass:</b> ${esc(it.glass)} ` : ''}${it.remarks ? `<b>Remarks:</b> ${esc(it.remarks)}` : ''}</p>` : ''}
     </section>`;
   }
+  // a little lift when items are approved, and a gold burst when the whole job is approved
+  function popApproved(list) {
+    list.forEach((it) => $app.querySelectorAll(`[data-id="${it.id}"]`).forEach((el) => {
+      el.classList.remove('justok'); void el.offsetWidth; el.classList.add('justok');
+    }));
+    if (list.length && job.items.length && job.items.every((x) => x.approved)) celebrate();
+  }
+  function celebrate() {
+    toast('All approved · ready for production');
+    const box = document.createElement('div');
+    box.className = 'burst';
+    const colours = ['#D4AF37', '#EFD87E', '#B48A1D', '#243085', '#34D399'];
+    box.innerHTML = Array.from({ length: 36 }, (_, i) => {
+      const an = (i / 36) * Math.PI * 2, d = 120 + Math.random() * 160;
+      return `<i style="--x:${Math.cos(an) * d}px;--y:${Math.sin(an) * d - 60}px;--r:${Math.random() * 540}deg;background:${colours[i % colours.length]};animation-delay:${Math.random() * 80}ms"></i>`;
+    }).join('');
+    document.body.appendChild(box);
+    setTimeout(() => box.remove(), 1600);
+  }
   function approveItem(it) {
     const r = RULES.check(it, settings.toleranceMm);
     if (!r.complete) return false;
@@ -551,9 +651,7 @@
     const count = (k) => items.filter((i) => i.type === k).reduce((a, i) => a + qtyOf(i), 0);
     const total = items.reduce((a, i) => a + qtyOf(i), 0);
     return `
-      <div class="sheetbar noprint">
-        <p class="sub">${pending ? `<span class="warn">${pending} item${pending === 1 ? ' is' : 's are'} not approved yet and not on this sheet.</span>` : job.items.length ? 'All items approved.' : 'No items yet.'}</p>
-      </div>
+
       <article class="sheet">
         <header class="sh-head">
           <div class="sh-co"><img src="assets/titans_logo_trim.png" alt=""><div><b>${esc(C.company)}</b><span>PRODUCTION SHEET</span></div></div>
@@ -570,7 +668,7 @@
             ${items.map((it, i) => `<tr>
               <td><b>${esc(it.code)}</b></td>
               <td class="num"><b>${esc(it.final.w)}</b></td><td class="num"><b>${esc(it.final.h)}</b></td><td class="num"><b>${qtyOf(it)}</b></td>
-              <td>${esc(it.design)}</td><td>${esc(it.colour)}</td><td>${esc(it.glass)}</td><td>${esc(it.remarks)}</td>
+              <td class="sh-design">${it.design ? DRAW.svg(it.design, it.final.w, it.final.h, { cls: 'shsvg' }) : ''}<span>${esc(it.design)}</span></td><td>${esc(it.colour)}</td><td>${esc(it.glass)}</td><td>${esc(it.remarks)}</td>
               <td class="cut"><div class="cutboxes"><span></span><span></span><span></span><span></span></div></td>
             </tr>`).join('') || `<tr><td colspan="9" class="empty">No approved items yet.</td></tr>`}
           </tbody>
@@ -585,10 +683,10 @@
 
   function steps(cur) {
     if (!job) return '';
-    const s = [['job', 'Measurement'], ['review', 'Review & approve'], ['sheet', 'Production sheet']];
-    const ok = job.items.length > 0;
+    const s = [['job', 'Measurement'], ['review', 'Approval'], ['sheet', 'Production sheet']];
+    const open = { job: true, review: canReview(job), sheet: allApproved(job) };
     return `<nav class="steps">${s.map(([k, l], i) => {
-      const href = k === 'job' || ok ? `#/${k}/${job.id}` : null;
+      const href = open[k] ? `#/${k}/${job.id}` : null;
       return href ? `<a href="${href}" class="${k === cur ? 'on' : ''}"><i>${i + 1}</i>${l}</a>` : `<span><i>${i + 1}</i>${l}</span>`;
     }).join('')}</nav>`;
   }
@@ -609,8 +707,9 @@
           <div class="keylist" data-keylist>${settings.keys.map(([k, t]) => keyRow(k, t)).join('')}</div>
           <div><button class="btn small" data-act="key-add">+ Add code</button></div>
         </div>
-        <label class="f"><span>Glass suggestions (one per line)</span><textarea rows="8" data-set="glass">${esc(settings.glass.join('\n'))}</textarea></label>
-        <label class="f"><span>Colour suggestions (one per line)</span><textarea rows="6" data-set="colours">${esc(settings.colours.join('\n'))}</textarea></label>
+        ${chipList('locations', 'Location choices')}
+        ${chipList('colours', 'Colour choices')}
+        ${chipList('glass', 'Glass choices')}
         <div class="actions"><button class="btn gold" data-act="save-settings">Save settings</button></div>
       </section>
       <section class="card">
@@ -623,6 +722,12 @@
       </section>`;
   }
 
+  // an editable list: each choice can be renamed in place or removed, and new ones added
+  function chip(v) { return `<span class="chip"><input value="${esc(v)}" size="${Math.max(4, String(v).length + 1)}" aria-label="Choice"><button class="chipx" data-act="chip-del" title="Remove">✕</button></span>`; }
+  function chipList(key, label) {
+    return `<div class="f"><span>${label}</span><div class="chips" data-list="${key}">${settings[key].map(chip).join('')}
+      <span class="chipadd"><input placeholder="Add new…" data-chip-new><button class="btn small" data-act="chip-add">+ Add</button></span></div></div>`;
+  }
   function defPick(key, val, list) {
     const all = val && !list.includes(val) ? [val, ...list] : list;
     return `<select data-set="${key}">${all.map((x) => `<option ${x === val ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>`;
@@ -656,7 +761,7 @@
     const el = e.target;
     if (el.matches('[data-search]')) {
       const q = el.value.trim().toLowerCase();
-      document.querySelectorAll('.jobrow').forEach((r) => (r.hidden = q && !r.dataset.text.includes(q)));
+      applyHomeFilter();
       return;
     }
     if (!job) return;
@@ -674,6 +779,8 @@
       dropStaleApproval(it);
       const card = el.closest('.item');
       markRow(card, it);
+      if (it.design) updateDesignBtn(it);
+      if (RULES.check(it, settings.toleranceMm).complete) card.classList.remove('missing');
       if (wasApproved && !it.approved) { refreshCardPills(); toast(`${it.code}: measurement changed, approve again`); }
       previewSoon();
       return touch();
@@ -706,16 +813,15 @@
     if (el.matches('[data-import]')) return importBackup(el.files[0]);
     if (!job) return;
     const it = itemOf(el);
-    if (el.value === '__other' && it && (el.dataset.k === 'colour' || el.dataset.k === 'glass')) {
-      const what = el.dataset.k === 'glass' ? 'glass' : 'colour';
-      const v = (prompt(`Type the ${what}:`) || '').trim();
+    if (el.value === '__other' && it && LISTS[el.dataset.k]) {
+      const [listKey, label] = LISTS[el.dataset.k];
+      const v = (prompt(`Type the ${label.toLowerCase()}:`) || '').trim();
       if (v) {
         it[el.dataset.k] = v;
-        const list = what === 'glass' ? settings.glass : settings.colours;
-        if (!list.includes(v)) { list.push(v); DB.set('settings', settings); }
+        if (!settings[listKey].includes(v)) { settings[listKey].push(v); DB.set('settings', settings); }
         touch(); previewSoon();
       }
-      el.closest('.sf').innerHTML = `<span>${what === 'glass' ? 'Glass' : 'Colour'}</span>${pick(el.dataset.k, it[el.dataset.k], what === 'glass' ? settings.glass : settings.colours)}`;
+      el.closest('.sf').innerHTML = `<span>${label}</span>${pick(el.dataset.k, it[el.dataset.k], settings[listKey])}`;
       return;
     }
     if (el.dataset.k === 'type' && it) {
@@ -744,13 +850,15 @@
     const it = job && itemOf(b);
 
     if (act === 'new-job') await newJob();
+    if (act === 'filter') { homeFilter = homeFilter === b.dataset.f ? 'all' : b.dataset.f; return viewHome(); }
     if (act === 'del-job' && confirm(`Delete job ${job.no} and all its measurements? This cannot be undone.`)) {
       await DB.deleteJob(job.id); job = null; location.hash = '#/';
     }
     if (act === 'add') {
       const n = newItem(job, b.dataset.type);
       job.items.push(n); touch(); viewWork();
-      const card = document.querySelector(`[data-id="${n.id}"]`);
+      const card = document.querySelector(`.item[data-id="${n.id}"]`);
+      card.classList.add('fresh');
       card.scrollIntoView({ behavior: 'smooth', block: 'start' });
       card.querySelector('[data-m="w"]').focus({ preventScroll: true });
     }
@@ -784,13 +892,16 @@
       const dup = dupCodes(job);
       if (dup.size) return alert('These codes are used more than once: ' + [...dup].join(', ') + '\nChange them first.');
       const missing = job.items.filter((x) => !RULES.check(x, settings.toleranceMm).complete).map((x) => x.code);
-      if (missing.length && !confirm(`Not all 3 widths and 3 heights are filled for: ${missing.join(', ')}.\nThey cannot be approved until filled. Continue?`)) return;
+      if (missing.length) {
+        $app.querySelectorAll('.item').forEach((c) => c.classList.toggle('missing', missing.includes(job.items.find((i) => i.id === c.dataset.id).code)));
+        $app.querySelector('.item.missing')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return alert(`Fill all 3 widths and 3 heights first for: ${missing.join(', ')}`);
+      }
       job.sentToReview = true; touch(); await saveNow();
-      tab = 'review';
-      if (wide()) { showPane(); toast('Check and approve on the right'); }
-      else location.hash = `#/review/${job.id}`;
+      tab = 'review'; toast('Measurements complete · saved');
+      location.hash = `#/review/${job.id}`;
     }
-    if (act === 'approve' && it) { if (approveItem(it)) { touch(); renderPreview(); refreshCardPills(); showFootOnly(); } }
+    if (act === 'approve' && it) { if (approveItem(it)) { touch(); renderPreview(); refreshCardPills(); showFootOnly(); popApproved([it]); } }
     if (act === 'unapprove' && it) { it.approved = false; it.approvedAt = null; it.approvedSig = null; touch(); renderPreview(); refreshCardPills(); showFootOnly(); }
     if (act === 'tab') {
       tab = b.dataset.tab;
@@ -799,10 +910,12 @@
     }
     if (act === 'approve-ok') {
       let n = 0;
-      job.items.forEach((x) => { const r = RULES.check(x, settings.toleranceMm); if (!x.approved && r.complete && !r.flagged && approveItem(x)) n++; });
-      touch(); renderPreview(); refreshCardPills(); showFootOnly(); toast(n ? `${n} approved` : 'Nothing to approve');
+      const done = [];
+      job.items.forEach((x) => { const r = RULES.check(x, settings.toleranceMm); if (!x.approved && r.complete && !r.flagged && approveItem(x)) { n++; done.push(x); } });
+      touch(); renderPreview(); refreshCardPills(); showFootOnly(); popApproved(done);
+      if (!job.items.every((x) => x.approved)) toast(n ? `${n} approved` : 'Nothing to approve');
     }
-    if (act === 'to-sheet') { await saveNow(); tab = 'sheet'; if (wide()) showPane(); else location.hash = `#/sheet/${job.id}`; }
+    if (act === 'to-sheet') { if (!allApproved(job)) return toast('Approve every window first'); await saveNow(); tab = 'sheet'; if (wide()) showPane(); else location.hash = `#/sheet/${job.id}`; }
     if (act === 'print') { tab = 'sheet'; renderPreview(); }
     if (act === 'print') window.print();
     if (act === 'save-settings') saveSettings();
@@ -811,7 +924,19 @@
       document.querySelector('.keyrow:last-child [data-key-k]').focus();
     }
     if (act === 'key-del') b.closest('.keyrow').remove();
+    if (act === 'chip-del') b.closest('.chip').remove();
+    if (act === 'chip-add') addChip(b.closest('.chipadd').querySelector('input'));
     if (act === 'export') exportBackup();
+  });
+
+  function addChip(inp) {
+    const v = inp.value.trim();
+    if (!v) return inp.focus();
+    inp.closest('.chipadd').insertAdjacentHTML('beforebegin', chip(v));
+    inp.value = ''; inp.focus();
+  }
+  $app.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target.matches('[data-chip-new]')) { e.preventDefault(); addChip(e.target); }
   });
 
   // ---------- settings & backup ----------
@@ -819,14 +944,14 @@
     const get = (k) => document.querySelector(`[data-set="${k}"]`).value;
     const tol = Number(get('toleranceMm'));
     if (!(tol >= 0)) return alert('Enter the difference in mm.');
-    const lines = (s) => s.split('\n').map((x) => x.trim()).filter(Boolean);
     const keys = [...document.querySelectorAll('.keyrow')]
       .map((r) => [r.querySelector('[data-key-k]').value.trim().toUpperCase().replace(/\s+/g, ''), r.querySelector('[data-key-t]').value.trim()])
       .filter(([k]) => k);
     const seen = new Set(), twice = keys.filter(([k]) => (seen.has(k) ? true : (seen.add(k), false))).map(([k]) => k);
     if (twice.length) return alert('These codes are there twice: ' + twice.join(', '));
     const defaults = { colour: get('dcolour'), glass: { W: get('dglassW'), V: get('dglassV') } };
-    settings = { defaults, toleranceMm: tol, keys, glass: lines(get('glass')), colours: lines(get('colours')) };
+    const list = (k) => [...new Set([...document.querySelectorAll(`[data-list="${k}"] .chip input`)].map((i) => i.value.trim()).filter(Boolean))];
+    settings = { defaults, toleranceMm: tol, keys, glass: list('glass'), colours: list('colours'), locations: list('locations') };
     await DB.set('settings', settings); fillLists(); toast('Settings saved');
   }
   async function exportBackup() {
