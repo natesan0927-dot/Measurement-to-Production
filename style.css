@@ -655,3 +655,11 @@ button.stat:hover { transform: translateY(-2px); border-color: var(--border-stro
   .sh-table tbody td:last-child, .sh-table tbody tr.phrow td { border-right: 0 !important; }
   .sh-table thead th { border-right: 0.3mm solid #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* production sheets: one alignment for everything - centred in each box (Remarks reads from the left) */
+.sh-table th, .sh-table td { text-align: center !important; vertical-align: middle !important; }
+.sh-table th.rest, .sh-table td.rest { text-align: left !important; }
+.sh-table td.cut { padding: 6px 8px; }
+.sh-table .cutboxes { margin: 0 auto; }
+.sh-table tr.phrow td { text-align: left !important; }
+.sh-table td.fit { padding-left: 12px; padding-right: 12px; }
