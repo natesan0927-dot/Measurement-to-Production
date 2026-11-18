@@ -618,3 +618,28 @@ button.stat:hover { transform: translateY(-2px); border-color: var(--border-stro
 /* approval table: the least of the three stays yellow; the Least row below has its own look (navy, gold) */
 .mt.vert tr.sum td.least { background: var(--navy-800); color: var(--gold-300); font-weight: 700; }
 .mt.vert tr.sum:first-of-type th { background: var(--navy-800); color: #fff; }
+
+/* production sheets: bigger, bolder text that is easy to read on the shop floor */
+.sh-table { font-size: 15.5px; }
+.sh-table td { font-weight: 600; color: #0A1030; padding: 10px 9px; }
+.sh-table td b { font-weight: 800; }
+.sh-table th { font-size: 14px; font-weight: 800; letter-spacing: .02em; padding: 10px 9px; }
+.sh-table .num, .sh-table td.num b { font-size: 19px; font-weight: 800; }
+.sh-table .sh-design b { font-size: 16px; font-weight: 800; }
+.sh-info { font-size: 14.5px; }
+.sh-info td { font-weight: 700; color: #0A1030; }
+.sh-info th { font-weight: 600; }
+.sh-foot { font-size: 14.5px; font-weight: 600; }
+.sh-co b { font-size: 22px; }
+.ph-link b { font-size: 14px; } .ph-link a { font-size: 13px; font-weight: 600; }
+@media print {
+  .sh-table { font-size: 11.5pt; }
+  .sh-table td { color: #000; padding: 2.2mm 2mm; }
+  .sh-table th { font-size: 10.5pt; padding: 2.2mm 2mm; }
+  .sh-table .num, .sh-table td.num b { font-size: 14pt; }
+  .sh-table .sh-design b { font-size: 12pt; }
+  .sh-info { font-size: 10.5pt; } .sh-info td { color: #000; }
+  .sh-foot { font-size: 10.5pt; }
+}
+.sh-sign div { font-size: 14px; font-weight: 700; color: #0A1030; }
+@media print { .sh-sign div { font-size: 10.5pt; color: #000; } }
