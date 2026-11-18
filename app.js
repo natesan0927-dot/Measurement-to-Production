@@ -631,7 +631,7 @@
     const cls = it.approved ? 'approved' : r.flagged || !r.complete ? 'flagged' : '';
     return `<section class="card rv ${cls}" data-id="${it.id}">
       <div class="rv-head">
-        <b class="rv-code">${esc(it.code)}</b><span class="muted">${esc(typeOf(it.type).label)}${it.location ? ' · ' + esc(it.location) : ''}${it.section ? ' · ' + esc(it.section) : ''}${it.design ? ' · ' + esc(it.design) : ''}${it.colour ? ' · ' + esc(it.colour) : ''}</span>
+        <b class="rv-code">${esc(it.code)}</b><span class="muted">${esc(typeOf(it.type).label)}${it.location ? ' · ' + esc(it.location) : ''}</span>
         <span class="grow"></span>
         ${it.approved ? `<span class="pill approved">✓ Approved</span>` : r.flagged ? `<span class="pill over">⚠ Over ${settings.toleranceMm} mm</span>` : !r.complete ? `<span class="pill over">Incomplete</span>` : `<span class="pill">Ready</span>`}
       </div>
@@ -654,8 +654,8 @@
             ? `<button class="btn small ghost" data-act="unapprove">Undo approval</button>`
             : `<button class="btn small gold" data-act="approve" ${r.complete ? '' : 'disabled'}>Approve</button>`}
         </div>
+        ${rvDetails(it)}
       </div>
-      ${it.glass || it.remarks ? `<p class="rv-note">${it.glass ? `<b>Glass:</b> ${esc(it.glass)} ` : ''}${it.remarks ? `<b>Remarks:</b> ${esc(it.remarks)}` : ''}</p>` : ''}
     </section>`;
   }
   // a little lift when items are approved, and a gold burst when the whole job is approved
@@ -676,6 +676,18 @@
     }).join('');
     document.body.appendChild(box);
     setTimeout(() => box.remove(), 1600);
+  }
+  // everything else about the window, next to its sizes on the approval page
+  function rvDetails(it) {
+    const n = (it.photos || []).length;
+    const rows = [
+      ['Type', typeOf(it.type).label], ['Location', it.location], ['Design', it.design], ['Glass', it.glass],
+      ['Colour', it.colour], ['Section', it.section], ['Site photos', n ? `📷 ${n}` : ''],
+    ];
+    return `<dl class="rv-info">
+      ${rows.map(([k, v]) => `<div><dt>${k}</dt><dd class="${v ? '' : 'none'}${k === 'Design' && v ? ' code' : ''}">${v ? esc(v) : '–'}</dd></div>`).join('')}
+      <div class="wide"><dt>Remarks</dt><dd class="${it.remarks ? '' : 'none'}">${it.remarks ? esc(it.remarks) : '–'}</dd></div>
+    </dl>`;
   }
   function approveItem(it) {
     const r = RULES.check(it, settings.toleranceMm);
