@@ -8,9 +8,14 @@
 (function () {
   const C = window.CONFIG;
   const $app = document.getElementById('app');
-  let settings = { toleranceMm: C.toleranceMm, designs: C.designs.slice(), glass: C.glass.slice(), colours: C.colours.slice() };
+  let settings = { toleranceMm: C.toleranceMm, keys: C.designKeys.map((x) => x.slice()), glass: C.glass.slice(), colours: C.colours.slice() };
   let job = null;        // the job open right now
   let saveTimer = null;
+  let pane = 'job';      // what a phone shows: 'job' (measurements), 'review' or 'sheet'
+  let tab = 'review';    // what the right-hand side shows on a wide screen: 'review' or 'sheet'
+  let previewTimer = null;
+  const openRows = new Set();   // rows whose details (location, qty, colour, glass, remarks, photo) are open
+  const wide = () => window.matchMedia('(min-width: 1000px)').matches;
 
   // ---------- small helpers ----------
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -28,7 +33,6 @@
   }
 
   function fillLists() {
-    document.getElementById('dl-design').innerHTML = settings.designs.map((d) => `<option value="${esc(d)}">`).join('');
     document.getElementById('dl-glass').innerHTML = settings.glass.map((d) => `<option value="${esc(d)}">`).join('');
     document.getElementById('dl-colour').innerHTML = settings.colours.map((d) => `<option value="${esc(d)}">`).join('');
   }
@@ -113,6 +117,17 @@
     const h = location.hash.replace(/^#\/?/, '');
     const [view, id] = h.split('/');
     document.querySelectorAll('.tabs a').forEach((a) => a.classList.toggle('active', a.dataset.tab === (view === 'settings' ? 'settings' : 'home')));
+    const work = ['job', 'review', 'sheet'].includes(view);
+    document.body.dataset.view = work ? 'work' : view || 'home';
+    if (work) {
+      pane = view;
+      if (view !== 'job') tab = view;
+      // same job already open: only switch what is shown, keep the measurements where they are
+      if (job && job.id === id && $app.querySelector('.workspace')) {
+        if (!wide()) window.scrollTo(0, 0);
+        return showPane();
+      }
+    }
     window.scrollTo(0, 0);
     if (!view) return viewHome();
     if (view === 'settings') return viewSettings();
@@ -120,9 +135,7 @@
     if (!job) { location.hash = '#/'; return; }
     job.items = job.items || [];
     job.items.forEach(dropStaleApproval);
-    if (view === 'job') return viewJob();
-    if (view === 'review') return viewReview();
-    if (view === 'sheet') return viewSheet();
+    if (work) return viewWork();
     location.hash = '#/';
   }
   window.addEventListener('hashchange', route);
@@ -156,111 +169,205 @@
     </a>`;
   }
 
-  // ================= Measurement =================
-  function viewJob() {
+  // ================= Job: measurements (left) + live review / production sheet (right) =================
+  function viewWork() {
     const dup = dupCodes(job);
     $app.innerHTML = `
-      ${steps('job')}
-      <div class="head">
-        <div><h1>${esc(job.no)} <small data-saved>Saved</small></h1><p class="sub">Measure each window: 3 widths (left, centre, right) and 3 heights (top, middle, bottom), in mm.</p></div>
-        <button class="btn ghost danger" data-act="del-job">Delete job</button>
-      </div>
-      <section class="card">
-        <h2>Site details</h2>
-        <div class="grid">
-          ${field('Customer name', 'customer')}
-          ${field('Phone', 'phone', 'tel')}
-          ${field('Site / project', 'site')}
-          ${field('Measured by', 'measuredBy')}
-          ${field('Address', 'address', 'text', 'wide')}
-          ${field('Date', 'date', 'date')}
+      <div data-steps></div>
+      <div class="workspace">
+        <div class="formcol noprint">
+          <div class="head">
+            <div><h1>${esc(job.no)} <small data-saved>Saved</small></h1><p class="sub">One line per window, in mm: 3 widths (left, centre, right), 3 heights (top, middle, bottom), then tap Design.</p></div>
+            <button class="btn ghost danger small" data-act="del-job">Delete job</button>
+          </div>
+          <section class="card">
+            <h2>Site details</h2>
+            <div class="grid">
+              ${field('Customer name', 'customer')}
+              ${field('Phone', 'phone', 'tel')}
+              ${field('Site / project', 'site')}
+              ${field('Measured by', 'measuredBy')}
+              ${field('Address', 'address', 'text', 'wide')}
+              ${field('Date', 'date', 'date')}
+            </div>
+          </section>
+          ${job.items.length ? `<div class="rowhead"><span>Code</span><span>Width <small>L · C · R</small></span><span>Height <small>T · M · B</small></span><span>Design</span><span></span></div>` : ''}
+          <div class="items" data-items>
+            ${job.items.map((it, idx) => itemCard(it, idx, dup)).join('')}
+          </div>
+          ${job.items.length ? '' : `<div class="empty">No windows yet. Add a window or a ventilator below.</div>`}
+          <div class="addbar">
+            ${C.types.map((t) => `<button class="btn" data-act="add" data-type="${t.key}">+ Add ${esc(t.label)} <em>${esc(nextCode(job, t.key))}</em></button>`).join('')}
+          </div>
         </div>
-      </section>
-      <div class="items" data-items>
-        ${job.items.map((it, idx) => itemCard(it, idx, dup)).join('')}
+        <aside class="previewcol">
+          <div class="previewhead noprint">
+            <div class="ptabs">
+              <button data-act="tab" data-tab="review">Review &amp; approve</button>
+              <button data-act="tab" data-tab="sheet">Production sheet</button>
+            </div>
+            <small class="muted">Updates as you type</small>
+          </div>
+          <div data-preview></div>
+        </aside>
       </div>
-      ${job.items.length ? '' : `<div class="empty">No windows yet. Add a window or a ventilator below.</div>`}
-      <div class="addbar">
-        ${C.types.map((t) => `<button class="btn" data-act="add" data-type="${t.key}">+ Add ${esc(t.label)} <em>${esc(nextCode(job, t.key))}</em></button>`).join('')}
-      </div>
-      <div class="footbar">
-        <button class="btn" data-act="save">Save</button>
-        <button class="btn gold" data-act="to-review" ${job.items.length ? '' : 'disabled'}>Proceed to production sheet →</button>
-      </div>`;
+      <div class="footbar noprint" data-foot></div>`;
+    $app.querySelectorAll('.item').forEach((card) => markRow(card, job.items.find((i) => i.id === card.dataset.id)));
+    showPane();
+  }
+
+  // what is shown where: on a wide screen measurements left + tab right; on a phone one at a time
+  function showPane() {
+    const ws = $app.querySelector('.workspace');
+    if (!ws) return;
+    ws.dataset.pane = pane;
+    $app.querySelector('[data-steps]').innerHTML = steps(pane);
+    $app.querySelectorAll('.ptabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
+    const approved = job.items.filter((i) => i.approved).length;
+    const foot = {
+      job: `<button class="btn" data-act="save">Save</button>
+            <button class="btn gold" data-act="to-review" ${job.items.length ? '' : 'disabled'}>Proceed to production sheet →</button>`,
+      review: `<a class="btn ghost" href="#/job/${job.id}">← Measurements</a>
+            <button class="btn gold" data-act="to-sheet" ${approved ? '' : 'disabled'}>Open production sheet →</button>`,
+      sheet: `<a class="btn ghost" href="#/review/${job.id}">← Review</a>
+            <button class="btn gold" data-act="print">Print / Save PDF</button>`,
+    };
+    // wide screen: measurements are always on the left, so the buttons follow the right-hand tab
+    const key = wide() ? (job.sentToReview ? tab : 'job') : pane;
+    $app.querySelector('[data-foot]').innerHTML = (wide() && key !== 'job' ? `<button class="btn" data-act="save">Save</button>` : '') + foot[key];
+    renderPreview();
+  }
+  function showFootOnly() {
+    const keepTab = tab; showPane(); tab = keepTab;
+  }
+  function renderPreview() {
+    clearTimeout(previewTimer);
+    const el = $app.querySelector('[data-preview]');
+    if (!el) return;
+    const keep = el.parentElement.scrollTop;
+    el.innerHTML = tab === 'sheet' ? sheetHtml() : reviewHtml();
+    el.parentElement.scrollTop = keep;
+  }
+  function previewSoon() {
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(renderPreview, 200);
+  }
+  // the "Approved" badge on a measurement card, kept in step with the right-hand side
+  function refreshCardPills() {
+    $app.querySelectorAll('.item').forEach((card) => {
+      const it = job.items.find((i) => i.id === card.dataset.id);
+      if (it) card.querySelector('[data-pill]').innerHTML = it.approved ? `<span class="pill approved">Approved</span>` : '';
+    });
   }
   function field(label, key, type = 'text', cls = '') {
     return `<label class="f ${cls}"><span>${label}</span><input type="${type}" data-job="${key}" value="${esc(job[key] || '')}"></label>`;
   }
 
+  // one line per window: code | width L C R | height T M B | design | more
   function itemCard(it, idx, dup) {
-    const t = typeOf(it.type);
     const isDup = dup && dup.has(String(it.code).trim().toUpperCase());
-    return `<section class="card item ${it.type === 'V' ? 'vent' : ''}" data-id="${it.id}">
-      <div class="item-head">
-        <span class="badge">${idx + 1}</span>
-        <label class="code ${isDup ? 'bad' : ''}"><span>Code</span><input data-k="code" value="${esc(it.code)}" title="${isDup ? 'This code is used twice' : 'You can change the code'}"></label>
-        <select data-k="type">${C.types.map((x) => `<option value="${x.key}" ${x.key === it.type ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}</select>
-        <span class="grow"></span>
-        ${it.approved ? `<span class="pill approved">Approved</span>` : ''}
-        <button class="icon" data-act="up" title="Move up">↑</button>
-        <button class="icon" data-act="down" title="Move down">↓</button>
-        <button class="icon danger" data-act="del" title="Delete">✕</button>
+    const open = openRows.has(it.id);
+    const sub = [it.location, qtyOf(it) > 1 ? `× ${qtyOf(it)}` : '', it.colour, it.glass].filter(Boolean).join(' · ');
+    return `<section class="item ${it.type === 'V' ? 'vent' : ''} ${open ? 'open' : ''}" data-id="${it.id}">
+      <div class="row">
+        <input class="code ${isDup ? 'bad' : ''}" data-k="code" value="${esc(it.code)}" title="${isDup ? 'This code is used twice' : 'Code (you can change it)'}" aria-label="Code">
+        <div class="trio" data-g="w">${mInput('w', 0, 'Width left', it)}${mInput('w', 1, 'Width centre', it)}${mInput('w', 2, 'Width right', it)}</div>
+        <div class="trio" data-g="h">${mInput('h', 0, 'Height top', it)}${mInput('h', 1, 'Height middle', it)}${mInput('h', 2, 'Height bottom', it)}</div>
+        <button class="design ${it.design ? '' : 'empty'}" data-act="keypad" title="Design">${it.design ? esc(it.design) : 'Design'}</button>
+        <button class="icon more" data-act="more" title="More: location, quantity, colour, glass, remarks, photo">${open ? '▴' : '⋯'}</button>
       </div>
-      <div class="meas">
-        <div class="mgroup">
-          <h3>Width <small>mm</small></h3>
-          <div class="trio">
-            ${mInput('w', 0, 'Left', it)}${mInput('w', 1, 'Centre', it)}${mInput('w', 2, 'Right', it)}
-          </div>
+      <div class="rowsub"><span data-status>${rowStatus(it)}</span><span class="muted" data-sub>${esc(sub)}</span><span data-pill>${it.approved ? `<span class="pill approved">Approved</span>` : ''}</span></div>
+      <div class="details" ${open ? '' : 'hidden'}>
+        <div class="grid">
+          <label class="f"><span>Location</span><input data-k="location" value="${esc(it.location)}" placeholder="e.g. Hall, Master bedroom"></label>
+          <label class="f"><span>Quantity</span><input inputmode="numeric" pattern="[0-9]*" data-k="qty" value="${esc(it.qty == null ? 1 : it.qty)}"></label>
+          <label class="f"><span>Colour</span><input data-k="colour" list="dl-colour" value="${esc(it.colour)}" placeholder="e.g. White"></label>
+          <label class="f"><span>Glass specification</span><input data-k="glass" list="dl-glass" value="${esc(it.glass)}" placeholder="e.g. 5 mm Toughened Clear"></label>
+          <label class="f wide"><span>Remarks</span><textarea data-k="remarks" rows="2" placeholder="Opening side, site conditions…">${esc(it.remarks)}</textarea></label>
         </div>
-        <div class="mgroup">
-          <h3>Height <small>mm</small></h3>
-          <div class="trio">
-            ${mInput('h', 0, 'Top', it)}${mInput('h', 1, 'Middle', it)}${mInput('h', 2, 'Bottom', it)}
-          </div>
+        <div class="photo">
+          ${it.photo ? `<img src="${it.photo}" alt="Photo of ${esc(it.code)}" data-act="view-photo"><button class="btn small ghost" data-act="del-photo">Remove photo</button>` : ''}
+          <label class="btn small">${it.photo ? 'Change photo' : '📷 Add photo'}<input type="file" accept="image/*" data-photo hidden></label>
+          <span class="grow"></span>
+          <select data-k="type" aria-label="Type">${C.types.map((x) => `<option value="${x.key}" ${x.key === it.type ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}</select>
+          <button class="icon" data-act="up" title="Move up">↑</button>
+          <button class="icon" data-act="down" title="Move down">↓</button>
+          <button class="icon danger" data-act="del" title="Delete">✕</button>
         </div>
-      </div>
-      <div class="live" data-live>${liveSummary(it)}</div>
-      <div class="grid">
-        <label class="f"><span>Location</span><input data-k="location" value="${esc(it.location)}" placeholder="e.g. Hall, Master bedroom"></label>
-        <label class="f qty"><span>Quantity</span><input inputmode="numeric" pattern="[0-9]*" data-k="qty" value="${esc(it.qty == null ? 1 : it.qty)}"></label>
-        <label class="f"><span>Colour</span><input data-k="colour" list="dl-colour" value="${esc(it.colour)}" placeholder="e.g. White"></label>
-        <label class="f"><span>Design</span><input data-k="design" list="dl-design" value="${esc(it.design)}" placeholder="e.g. 2 Track Sliding"></label>
-        <label class="f"><span>Glass specification</span><input data-k="glass" list="dl-glass" value="${esc(it.glass)}" placeholder="e.g. 5 mm Toughened Clear"></label>
-        <label class="f wide"><span>Remarks</span><textarea data-k="remarks" rows="2" placeholder="Location, opening side, site conditions…">${esc(it.remarks)}</textarea></label>
-      </div>
-      <div class="photo">
-        ${it.photo
-          ? `<img src="${it.photo}" alt="Photo of ${esc(it.code)}" data-act="view-photo"><button class="btn small ghost" data-act="del-photo">Remove photo</button>`
-          : ''}
-        <label class="btn small">${it.photo ? 'Change photo' : '📷 Add photo'}<input type="file" accept="image/*" data-photo hidden></label>
       </div>
     </section>`;
   }
   function mInput(dim, i, label, it) {
-    return `<label class="m"><span>${label}</span><input inputmode="numeric" pattern="[0-9]*" data-m="${dim}" data-i="${i}" value="${esc(it[dim][i])}" placeholder="0"></label>`;
+    return `<input inputmode="numeric" pattern="[0-9]*" data-m="${dim}" data-i="${i}" value="${esc(it[dim][i])}" placeholder="${'LCRTMB'[dim === 'w' ? i : i + 3]}" aria-label="${label}" title="${label}">`;
   }
-  function liveSummary(it) {
+  // short status under the line: least size, and the difference in red if over the limit
+  function rowStatus(it) {
     const r = RULES.check(it, settings.toleranceMm);
-    const part = (s, over, name) => s.count
-      ? `<span class="${over ? 'over' : 'ok'}">${name}: least <b>${s.min}</b> · diff <b>${s.diff} mm</b>${over ? ' ⚠' : ''}${s.complete ? '' : ` · ${3 - s.count} missing`}</span>`
-      : `<span class="muted">${name}: not measured</span>`;
-    return part(r.w, r.wOver, 'Width') + part(r.h, r.hOver, 'Height');
+    if (!r.w.count && !r.h.count) return '';
+    const part = (s, over) => s.count
+      ? `<b class="${over ? 'over' : 'ok'}">${s.min}${s.complete ? '' : '?'}</b>${s.count > 1 && s.diff ? `<small class="${over ? 'over' : ''}">${over ? '⚠ ' : ''}±${s.diff}</small>` : ''}`
+      : '<b>–</b>';
+    return `<span class="least">${part(r.w, r.wOver)} × ${part(r.h, r.hOver)}</span>`;
+  }
+  // colour the width / height boxes: least in yellow, the whole set red if over the limit
+  function markRow(card, it) {
+    const r = RULES.check(it, settings.toleranceMm);
+    ['w', 'h'].forEach((g) => {
+      const st = r[g], over = g === 'w' ? r.wOver : r.hOver;
+      const box = card.querySelector(`[data-g="${g}"]`);
+      box.classList.toggle('over', over);
+      box.querySelectorAll('input').forEach((inp) => inp.classList.toggle('least', st.count > 1 && inp.value !== '' && Number(inp.value) === st.min));
+    });
+    card.querySelector('[data-status]').innerHTML = rowStatus(it);
+  }
+  function rowSub(card, it) {
+    card.querySelector('[data-sub]').textContent = [it.location, qtyOf(it) > 1 ? `× ${qtyOf(it)}` : '', it.colour, it.glass].filter(Boolean).join(' · ');
+  }
+
+  // ---------- design key pad ----------
+  let kpItem = null;
+  function openKeypad(it) {
+    kpItem = it;
+    closeKeypad(true);
+    const box = document.createElement('div');
+    box.className = 'kp-back';
+    box.innerHTML = `<div class="keypad" role="dialog" aria-label="Design">
+      <div class="kp-top"><b>${esc(it.code)} design</b><input data-kp-text value="${esc(it.design)}" placeholder="Tap the keys below"></div>
+      <div class="kp-keys">${settings.keys.map(([k, t]) => `<button data-kp="${esc(k)}" title="${esc(t)}"><b>${esc(k)}</b><small>${esc(t)}</small></button>`).join('')}</div>
+      <div class="kp-act"><button class="btn" data-kp-back>⌫ Back</button><button class="btn ghost" data-kp-clear>Clear</button><button class="btn gold" data-kp-done>Done</button></div>
+    </div>`;
+    document.body.appendChild(box);
+    const text = box.querySelector('[data-kp-text]');
+    const set = (v) => { text.value = v; it.design = v; touch(); previewSoon(); updateDesignBtn(it); };
+    box.addEventListener('click', (e) => {
+      if (e.target === box) return closeKeypad();
+      const k = e.target.closest('[data-kp]');
+      if (k) return set((text.value.trim() + ' ' + k.dataset.kp).trim());
+      if (e.target.closest('[data-kp-back]')) return set(text.value.trim().split(/\s+/).slice(0, -1).join(' '));
+      if (e.target.closest('[data-kp-clear]')) return set('');
+      if (e.target.closest('[data-kp-done]')) return closeKeypad();
+    });
+    text.addEventListener('input', () => { it.design = text.value; touch(); previewSoon(); updateDesignBtn(it); });
+  }
+  function closeKeypad(silent) {
+    document.querySelectorAll('.kp-back').forEach((x) => x.remove());
+    if (!silent) kpItem = null;
+  }
+  function updateDesignBtn(it) {
+    const b = $app.querySelector(`.item[data-id="${it.id}"] .design`);
+    if (b) { b.textContent = it.design || 'Design'; b.classList.toggle('empty', !it.design); }
   }
 
   // ================= Review & approve =================
-  function viewReview() {
+  function reviewHtml() {
     const tol = settings.toleranceMm;
     const rows = job.items.map((it) => ({ it, r: RULES.check(it, tol) }));
     const flagged = rows.filter((x) => x.r.flagged).length;
     const incomplete = rows.filter((x) => !x.r.complete).length;
     const approved = rows.filter((x) => x.it.approved).length;
-    $app.innerHTML = `
-      ${steps('review')}
-      <div class="head">
-        <div><h1>Review & approve <small data-saved>Saved</small></h1>
-        <p class="sub">${esc(job.no)} · ${esc(job.customer)} · The least width and height are taken for production. More than <b>${tol} mm</b> difference is shown in red.</p></div>
-      </div>
+    if (!rows.length) return `<div class="empty">Add a window on the left. Its sizes appear here to approve.</div>`;
+    return `
+      <p class="sub rv-intro">The least width and height are taken for production. More than <b>${tol} mm</b> difference is shown in red.</p>
       <div class="summary">
         <div><b>${rows.length}</b><span>items</span></div>
         <div class="${approved === rows.length ? 'ok' : ''}"><b>${approved}</b><span>approved</span></div>
@@ -269,14 +376,9 @@
       </div>
       <div class="actions">
         <button class="btn" data-act="approve-ok">Approve all within ${tol} mm</button>
-        <a class="btn ghost" href="#/job/${job.id}">← Back to measurements</a>
       </div>
       <div class="review">
         ${rows.map(({ it, r }) => reviewCard(it, r)).join('')}
-      </div>
-      <div class="footbar">
-        <span class="muted">${approved} of ${rows.length} approved</span>
-        <button class="btn gold" data-act="to-sheet" ${approved ? '' : 'disabled'}>Open production sheet →</button>
       </div>`;
   }
   function reviewCard(it, r) {
@@ -331,19 +433,15 @@
   }
 
   // ================= Production sheet =================
-  function viewSheet() {
+  function sheetHtml() {
     const items = job.items.filter((i) => i.approved);
     const pending = job.items.length - items.length;
     const count = (k) => items.filter((i) => i.type === k).reduce((a, i) => a + qtyOf(i), 0);
     const total = items.reduce((a, i) => a + qtyOf(i), 0);
-    $app.innerHTML = `
-      <div class="noprint">${steps('sheet')}</div>
-      <div class="head noprint">
-        <div><h1>Production sheet</h1><p class="sub">${pending ? `<span class="warn">${pending} item${pending === 1 ? ' is' : 's are'} not approved yet and not on this sheet.</span>` : 'All items approved.'}</p></div>
-        <div class="actions">
-          <a class="btn ghost" href="#/review/${job.id}">← Review</a>
-          <button class="btn gold" data-act="print">Print / Save PDF</button>
-        </div>
+    return `
+      <div class="sheetbar noprint">
+        <p class="sub">${pending ? `<span class="warn">${pending} item${pending === 1 ? ' is' : 's are'} not approved yet and not on this sheet.</span>` : job.items.length ? 'All items approved.' : 'No items yet.'}</p>
+        <button class="btn gold small" data-act="print">Print / Save PDF</button>
       </div>
       <article class="sheet">
         <header class="sh-head">
@@ -391,7 +489,7 @@
       <div class="head"><div><h1>Settings</h1><p class="sub">Saved on this device.</p></div></div>
       <section class="card">
         <label class="f"><span>Most allowed difference between the 3 measurements (mm)</span><input inputmode="numeric" data-set="toleranceMm" value="${settings.toleranceMm}"></label>
-        <label class="f"><span>Design suggestions (one per line)</span><textarea rows="8" data-set="designs">${esc(settings.designs.join('\n'))}</textarea></label>
+        <label class="f"><span>Design keys (one per line: KEY = what it means)</span><textarea rows="10" data-set="keys">${esc(settings.keys.map(([k, t]) => `${k} = ${t}`).join('\n'))}</textarea></label>
         <label class="f"><span>Glass suggestions (one per line)</span><textarea rows="8" data-set="glass">${esc(settings.glass.join('\n'))}</textarea></label>
         <label class="f"><span>Colour suggestions (one per line)</span><textarea rows="6" data-set="colours">${esc(settings.colours.join('\n'))}</textarea></label>
         <div class="actions"><button class="btn gold" data-act="save-settings">Save settings</button></div>
@@ -435,7 +533,7 @@
       return;
     }
     if (!job) return;
-    if (el.dataset.job) { job[el.dataset.job] = el.value; return touch(); }
+    if (el.dataset.job) { job[el.dataset.job] = el.value; previewSoon(); return touch(); }
     const it = itemOf(el);
     if (!it) return;
     if (el.dataset.m) {
@@ -444,8 +542,9 @@
       const wasApproved = it.approved;
       dropStaleApproval(it);
       const card = el.closest('.item');
-      card.querySelector('[data-live]').innerHTML = liveSummary(it);
-      if (wasApproved && !it.approved) { card.querySelector('.item-head .pill')?.remove(); toast(`${it.code}: measurement changed, approve again`); }
+      markRow(card, it);
+      if (wasApproved && !it.approved) { refreshCardPills(); toast(`${it.code}: measurement changed, approve again`); }
+      previewSoon();
       return touch();
     }
     if (el.dataset.final) {
@@ -457,13 +556,16 @@
     if (el.dataset.k && el.dataset.k !== 'type') {
       if (el.dataset.k === 'qty') el.value = el.value.replace(/\D/g, '');
       it[el.dataset.k] = el.value;
+      const card = el.closest('.item');
+      if (card) rowSub(card, it);
       if (el.dataset.k === 'code') {
         const dup = dupCodes(job);
         document.querySelectorAll('.item').forEach((card) => {
           const x = job.items.find((i) => i.id === card.dataset.id);
-          card.querySelector('.code').classList.toggle('bad', dup.has(String(x.code).trim().toUpperCase()));
+          card.querySelector('input.code').classList.toggle('bad', dup.has(String(x.code).trim().toUpperCase()));
         });
       }
+      previewSoon();
       return touch();
     }
   });
@@ -476,13 +578,13 @@
     if (el.dataset.k === 'type' && it) {
       it.type = el.value;
       if (confirm(`Change the code to ${nextCode(job, el.value)}?`)) it.code = nextCode(job, el.value);
-      touch(); viewJob();
+      touch(); viewWork();
     }
     if (el.matches('[data-photo]') && it && el.files[0]) {
-      try { it.photo = await readPhoto(el.files[0]); touch(); await saveNow(); viewJob(); }
+      try { it.photo = await readPhoto(el.files[0]); touch(); await saveNow(); viewWork(); }
       catch (err) { alert('Could not use this photo: ' + err.message); }
     }
-    if (el.dataset.final && it) viewReview();
+    if (el.dataset.final && it) renderPreview();
   });
 
   $app.addEventListener('click', async (e) => {
@@ -502,17 +604,23 @@
     }
     if (act === 'add') {
       const n = newItem(job, b.dataset.type);
-      job.items.push(n); touch(); viewJob();
+      job.items.push(n); touch(); viewWork();
       const card = document.querySelector(`[data-id="${n.id}"]`);
       card.scrollIntoView({ behavior: 'smooth', block: 'start' });
       card.querySelector('[data-m="w"]').focus({ preventScroll: true });
     }
-    if (act === 'del' && it && confirm(`Delete ${it.code}?`)) { job.items = job.items.filter((x) => x !== it); touch(); viewJob(); }
+    if (act === 'del' && it && confirm(`Delete ${it.code}?`)) { job.items = job.items.filter((x) => x !== it); touch(); viewWork(); }
     if ((act === 'up' || act === 'down') && it) {
       const i = job.items.indexOf(it), j = act === 'up' ? i - 1 : i + 1;
-      if (j >= 0 && j < job.items.length) { [job.items[i], job.items[j]] = [job.items[j], job.items[i]]; touch(); viewJob(); }
+      if (j >= 0 && j < job.items.length) { [job.items[i], job.items[j]] = [job.items[j], job.items[i]]; touch(); viewWork(); }
     }
-    if (act === 'del-photo' && it) { it.photo = null; touch(); viewJob(); }
+    if (act === 'keypad' && it) openKeypad(it);
+    if (act === 'more' && it) {
+      const card = b.closest('.item'), open = !openRows.has(it.id);
+      open ? openRows.add(it.id) : openRows.delete(it.id);
+      card.classList.toggle('open', open); card.querySelector('.details').hidden = !open; b.textContent = open ? '▴' : '⋯';
+    }
+    if (act === 'del-photo' && it) { it.photo = null; touch(); viewWork(); }
     if (act === 'view-photo') {
       const box = document.createElement('div');
       box.className = 'lightbox'; box.innerHTML = `<img src="${b.src}" alt="">`;
@@ -526,16 +634,24 @@
       const missing = job.items.filter((x) => !RULES.check(x, settings.toleranceMm).complete).map((x) => x.code);
       if (missing.length && !confirm(`Not all 3 widths and 3 heights are filled for: ${missing.join(', ')}.\nThey cannot be approved until filled. Continue?`)) return;
       job.sentToReview = true; touch(); await saveNow();
-      location.hash = `#/review/${job.id}`;
+      tab = 'review';
+      if (wide()) { showPane(); toast('Check and approve on the right'); }
+      else location.hash = `#/review/${job.id}`;
     }
-    if (act === 'approve' && it) { if (approveItem(it)) { touch(); viewReview(); } }
-    if (act === 'unapprove' && it) { it.approved = false; it.approvedAt = null; it.approvedSig = null; touch(); viewReview(); }
+    if (act === 'approve' && it) { if (approveItem(it)) { touch(); renderPreview(); refreshCardPills(); showFootOnly(); } }
+    if (act === 'unapprove' && it) { it.approved = false; it.approvedAt = null; it.approvedSig = null; touch(); renderPreview(); refreshCardPills(); showFootOnly(); }
+    if (act === 'tab') {
+      tab = b.dataset.tab;
+      if (wide()) showPane();
+      else location.hash = `#/${tab}/${job.id}`;
+    }
     if (act === 'approve-ok') {
       let n = 0;
       job.items.forEach((x) => { const r = RULES.check(x, settings.toleranceMm); if (!x.approved && r.complete && !r.flagged && approveItem(x, true)) n++; });
-      touch(); viewReview(); toast(n ? `${n} approved` : 'Nothing to approve');
+      touch(); renderPreview(); refreshCardPills(); showFootOnly(); toast(n ? `${n} approved` : 'Nothing to approve');
     }
-    if (act === 'to-sheet') { await saveNow(); location.hash = `#/sheet/${job.id}`; }
+    if (act === 'to-sheet') { await saveNow(); tab = 'sheet'; if (wide()) showPane(); else location.hash = `#/sheet/${job.id}`; }
+    if (act === 'print') { tab = 'sheet'; renderPreview(); }
     if (act === 'print') window.print();
     if (act === 'save-settings') saveSettings();
     if (act === 'export') exportBackup();
@@ -547,7 +663,8 @@
     const tol = Number(get('toleranceMm'));
     if (!(tol >= 0)) return alert('Enter the difference in mm.');
     const lines = (s) => s.split('\n').map((x) => x.trim()).filter(Boolean);
-    settings = { toleranceMm: tol, designs: lines(get('designs')), glass: lines(get('glass')), colours: lines(get('colours')) };
+    const keys = lines(get('keys')).map((l) => { const [k, ...t] = l.split('='); return [k.trim().toUpperCase(), t.join('=').trim()]; }).filter(([k]) => k);
+    settings = { toleranceMm: tol, keys, glass: lines(get('glass')), colours: lines(get('colours')) };
     await DB.set('settings', settings); fillLists(); toast('Settings saved');
   }
   async function exportBackup() {

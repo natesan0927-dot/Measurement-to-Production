@@ -15,10 +15,12 @@ window.CONFIG = {
     { key: 'V', label: 'Ventilator', prefix: 'V' },
   ],
 
-  designs: [
-    '2 Track Sliding', '3 Track Sliding', '2 Track Sliding with Mesh', 'Casement - Single',
-    'Casement - Double', 'Fixed', 'Top Hung', 'Bottom Hung', 'Tilt & Turn',
-    'Sliding Door', 'Casement Door', 'Ventilator - Fixed', 'Ventilator - Top Hung', 'Louvers',
+  // Keys on the design key pad. Tapping keys builds the design, e.g. "SL SL FIX" or "OP FIX OP".
+  // [key, what it means]
+  designKeys: [
+    ['SL', 'Sliding'], ['OP', 'Openable'], ['TH', 'Top hung'], ['BH', 'Bottom hung'],
+    ['FIX', 'Fixed'], ['VENT', 'Ventilator'], ['FAN', 'Exhaust fan'], ['MESH', 'Mosquito mesh'],
+    ['DOOR', 'Door'], ['LOUV', 'Louvers'], ['T&T', 'Tilt & turn'], ['ARCH', 'Arch'],
   ],
   colours: [
     'White', 'Ivory', 'Golden Oak', 'Walnut', 'Mahogany', 'Anthracite Grey', 'Black', 'White inside / Golden Oak outside',
