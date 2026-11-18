@@ -44,6 +44,7 @@
     job.status = jobStatus(job);
     clearTimeout(saveTimer);
     saveTimer = setTimeout(saveNow, 400);
+    navSoon();
     setSaved('Saving…');
   }
   function saveNow() {
@@ -111,12 +112,59 @@
     return C.jobPrefix + String(n).padStart(4, '0');
   }
 
+  // ---------- left sidebar ----------
+  const ICON = {
+    jobs: '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>',
+    new: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 11v6M9 14h6"/>',
+    job: '<path d="M3 7h18M3 12h18M3 17h18"/><path d="M7 4v16"/>',
+    review: '<path d="M5 12l5 5L20 7"/>',
+    sheet: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+    settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+  };
+  const svg = (k) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICON[k]}</svg>`;
+  let navTimer = null;
+  function navSoon() { clearTimeout(navTimer); navTimer = setTimeout(renderNav, 250); }
+  async function renderNav() {
+    const view = location.hash.replace(/^#\/?/, '').split('/')[0] || 'home';
+    const jobCount = (await DB.allJobs()).length;
+    const inJob = job && ['job', 'review', 'sheet'].includes(view);
+    // which stage is "current": on a PC the right-hand tab, on a phone the screen shown
+    const cur = inJob ? (wide() ? tab : pane) : null;
+    let stages = '';
+    if (inJob) {
+      const n = job.items.length, ok = job.items.filter((i) => i.approved).length;
+      const over = job.items.filter((i) => RULES.check(i, settings.toleranceMm).flagged && !i.approved).length;
+      const pcs = job.items.filter((i) => i.approved).reduce((a, i) => a + qtyOf(i), 0);
+      const st = [
+        ['job', 'job', '1 · Measurement', `${n} item${n === 1 ? '' : 's'}`, ''],
+        ['review', 'review', '2 · Review & approve', `${ok} of ${n} approved${over ? ` · ${over} over ${settings.toleranceMm} mm` : ''}`, over ? 'warn' : ok && ok === n ? 'done' : ''],
+        ['sheet', 'sheet', '3 · Production sheet', `${pcs} pcs ready`, ''],
+      ];
+      stages = `<div class="navsec">
+        <p class="navlabel">Current job</p>
+        <div class="navjob"><b>${esc(job.no)}</b><span>${esc(job.customer || 'No customer name')}</span></div>
+        ${st.map(([k, ic, label, sub, cls]) => `<a href="#/${k}/${job.id}" class="navitem stage ${cur === k ? 'active' : ''} ${cls}">
+          ${svg(ic)}<span>${label}<small>${sub}</small></span></a>`).join('')}
+      </div>`;
+    }
+    document.getElementById('navlist').innerHTML = `
+      <a href="#/" class="navitem ${view === 'home' ? 'active' : ''}">${svg('jobs')}<span>Jobs</span><em class="badge">${jobCount}</em></a>
+      <a href="#" class="navitem navnew" data-nav="new-job">${svg('new')}<span>New job</span></a>
+      ${stages}
+      <a href="#/settings" class="navitem navset ${view === 'settings' ? 'active' : ''}">${svg('settings')}<span>Settings</span></a>`;
+  }
+  document.getElementById('navlist').addEventListener('click', async (e) => {
+    const a = e.target.closest('[data-nav="new-job"]');
+    if (!a) return;
+    e.preventDefault();
+    await newJob();
+  });
+
   // ---------- routing ----------
   async function route() {
     await saveNow();
     const h = location.hash.replace(/^#\/?/, '');
     const [view, id] = h.split('/');
-    document.querySelectorAll('.tabs a').forEach((a) => a.classList.toggle('active', a.dataset.tab === (view === 'settings' ? 'settings' : 'home')));
     const work = ['job', 'review', 'sheet'].includes(view);
     document.body.dataset.view = work ? 'work' : view || 'home';
     if (work) {
@@ -129,8 +177,8 @@
       }
     }
     window.scrollTo(0, 0);
-    if (!view) return viewHome();
-    if (view === 'settings') return viewSettings();
+    if (!view) { await viewHome(); return renderNav(); }
+    if (view === 'settings') { viewSettings(); return renderNav(); }
     job = await DB.getJob(id);
     if (!job) { location.hash = '#/'; return; }
     job.items = job.items || [];
@@ -234,6 +282,7 @@
     };
     // wide screen: measurements are always on the left, so the buttons follow the right-hand tab
     const key = wide() ? (job.sentToReview ? tab : 'job') : pane;
+    renderNav();
     $app.querySelector('[data-foot]').innerHTML = (wide() && key !== 'job' ? `<button class="btn" data-act="save">Save</button>` : '') + foot[key];
     renderPreview();
   }
@@ -508,14 +557,14 @@
           </table>
         </header>
         <table class="sh-table">
-          <thead><tr><th>#</th><th>Code</th><th>Type</th><th>Location</th><th class="num">Width</th><th class="num">Height</th><th class="num">Qty</th><th>Design</th><th>Colour</th><th>Glass</th><th>Remarks</th><th>Photo</th></tr></thead>
+          <thead><tr><th>Code</th><th class="num">Width</th><th class="num">Height</th><th class="num">Qty</th><th>Design</th><th>Colour</th><th>Glass</th><th>Remarks</th><th class="cutth">Cutting sizes <small>(filled by production)</small></th></tr></thead>
           <tbody>
             ${items.map((it, i) => `<tr>
-              <td>${i + 1}</td><td><b>${esc(it.code)}</b></td><td>${esc(typeOf(it.type).label)}</td><td>${esc(it.location)}</td>
+              <td><b>${esc(it.code)}</b></td>
               <td class="num"><b>${esc(it.final.w)}</b></td><td class="num"><b>${esc(it.final.h)}</b></td><td class="num"><b>${qtyOf(it)}</b></td>
               <td>${esc(it.design)}</td><td>${esc(it.colour)}</td><td>${esc(it.glass)}</td><td>${esc(it.remarks)}</td>
-              <td>${it.photo ? `<img src="${it.photo}" alt="">` : ''}</td>
-            </tr>`).join('') || `<tr><td colspan="12" class="empty">No approved items yet.</td></tr>`}
+              <td class="cut"><div class="cutboxes"><span></span><span></span><span></span><span></span></div></td>
+            </tr>`).join('') || `<tr><td colspan="9" class="empty">No approved items yet.</td></tr>`}
           </tbody>
         </table>
         <footer class="sh-foot">
@@ -648,18 +697,19 @@
     if (el.dataset.final && it) renderPreview();
   });
 
+  async function newJob() {
+    const j = { id: uid(), no: await nextJobNo(), customer: '', phone: '', site: '', address: '', measuredBy: '', date: today(),
+      items: [], created: new Date().toISOString(), updated: new Date().toISOString(), status: 'measuring' };
+    await DB.putJob(j);
+    location.hash = `#/job/${j.id}`;
+  }
   $app.addEventListener('click', async (e) => {
     const b = e.target.closest('[data-act]');
     if (!b) return;
     const act = b.dataset.act;
     const it = job && itemOf(b);
 
-    if (act === 'new-job') {
-      const j = { id: uid(), no: await nextJobNo(), customer: '', phone: '', site: '', address: '', measuredBy: '', date: today(),
-        items: [], created: new Date().toISOString(), updated: new Date().toISOString(), status: 'measuring' };
-      await DB.putJob(j);
-      location.hash = `#/job/${j.id}`;
-    }
+    if (act === 'new-job') await newJob();
     if (act === 'del-job' && confirm(`Delete job ${job.no} and all its measurements? This cannot be undone.`)) {
       await DB.deleteJob(job.id); job = null; location.hash = '#/';
     }

@@ -17,18 +17,20 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header class="top noprint">
+<div class="layout">
+<!-- left sidebar on a PC (a top bar on a phone), like the quotation software -->
+<nav class="nav noprint">
   <a href="#/" class="brand">
-    <img src="assets/titans_logo_trim.png" alt="">
+    <img src="assets/titans_logo_trim.png" alt="Titans">
     <div><b>TITANS WINDOWS</b><span>Measurement to Production</span></div>
   </a>
-  <nav class="tabs">
-    <a href="#/" data-tab="home">Jobs</a>
-    <a href="#/settings" data-tab="settings">Settings</a>
-  </nav>
-</header>
+  <div class="navlist" id="navlist"></div>
+  <div class="navfoot"><div class="status"><i></i><span>Saved on this device</span></div></div>
+</nav>
 
 <main id="app"></main>
+</div>
+
 
 <div id="toast" class="toast" hidden></div>
 

@@ -29,8 +29,12 @@ updating as you type (like the quotation software). On a phone they are shown on
    - The production size can be edited in place before approving.
    - *Approve all within 8 mm* approves every item that is complete and within the limit.
    - If a measurement is changed later, that item's approval is dropped and it has to be approved again.
-4. **Production sheet** – lists the approved items with location, final width × height, quantity, design, colour, glass, remarks and photo, and the total quantity,
+4. **Production sheet** – lists the approved items: code, final width × height, quantity, design, colour, glass and remarks,
+   with **4 empty boxes per window for the cutting sizes** the production team works out and writes in by hand, and the total quantity,
    ready to print or save as PDF (A4 landscape) for the factory.
+
+**Left sidebar** (on a PC, like the quotation software): Jobs, New job, the open job with its three stages
+(Measurement, Review & approve, Production sheet: the current one highlighted, with counts) and Settings.
 
 The 8 mm limit, the design keys and the colour / glass suggestion lists can be changed under **Settings**.
 
