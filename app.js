@@ -639,8 +639,8 @@
       <div class="rv-body">
         <table class="mt">
           <tr><th></th><th>1</th><th>2</th><th>3</th><th>Least</th><th>Diff</th></tr>
-          <tr><th>W <small>L·C·R</small></th>${cell(it.w, r.w)}<td class="least">${mm(r.w.min)}</td><td class="${r.wOver ? 'over' : 'ok'}">${mm(r.w.diff)}</td></tr>
-          <tr><th>H <small>T·M·B</small></th>${cell(it.h, r.h)}<td class="least">${mm(r.h.min)}</td><td class="${r.hOver ? 'over' : 'ok'}">${mm(r.h.diff)}</td></tr>
+          <tr><th>W</th>${cell(it.w, r.w)}<td class="least">${mm(r.w.min)}</td><td class="${r.wOver ? 'over' : 'ok'}">${mm(r.w.diff)}</td></tr>
+          <tr><th>H</th>${cell(it.h, r.h)}<td class="least">${mm(r.h.min)}</td><td class="${r.hOver ? 'over' : 'ok'}">${mm(r.h.diff)}</td></tr>
         </table>
         <div class="final">
           <span>Production size (mm)</span>
