@@ -133,6 +133,7 @@ textarea { resize: vertical; }
 .rv.approved { border-left-color: var(--good); }
 .rv-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
 .rv-code { font: 700 18px var(--display); color: var(--navy-800); }
+.rv-qty { font: 700 13px var(--display); background: var(--navy-800); color: var(--gold-300); padding: 2px 9px; border-radius: 99px; }
 .rv-body { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
 .mt { border-collapse: collapse; font-size: 14px; flex: 1 1 320px; }
 .mt th, .mt td { border: 1px solid var(--border); padding: 6px 8px; text-align: center; }

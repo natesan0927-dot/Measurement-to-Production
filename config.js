@@ -20,6 +20,9 @@ window.CONFIG = {
     'Casement - Double', 'Fixed', 'Top Hung', 'Bottom Hung', 'Tilt & Turn',
     'Sliding Door', 'Casement Door', 'Ventilator - Fixed', 'Ventilator - Top Hung', 'Louvers',
   ],
+  colours: [
+    'White', 'Ivory', 'Golden Oak', 'Walnut', 'Mahogany', 'Anthracite Grey', 'Black', 'White inside / Golden Oak outside',
+  ],
   glass: [
     '5 mm Clear', '6 mm Clear', '5 mm Frosted', '5 mm Toughened Clear', '6 mm Toughened Clear',
     '8 mm Toughened Clear', '5 mm Reflective', '6+12+6 DGU', '5 mm Laminated',

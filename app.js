@@ -8,7 +8,7 @@
 (function () {
   const C = window.CONFIG;
   const $app = document.getElementById('app');
-  let settings = { toleranceMm: C.toleranceMm, designs: C.designs.slice(), glass: C.glass.slice() };
+  let settings = { toleranceMm: C.toleranceMm, designs: C.designs.slice(), glass: C.glass.slice(), colours: C.colours.slice() };
   let job = null;        // the job open right now
   let saveTimer = null;
 
@@ -19,6 +19,7 @@
   const fmtDate = (d) => { if (!d) return ''; const [y, m, dd] = d.slice(0, 10).split('-'); return `${dd}-${m}-${y}`; };
   const typeOf = (key) => C.types.find((t) => t.key === key) || C.types[0];
   const mm = (v) => (v == null || v === '' ? '–' : `${v}`);
+  const qtyOf = (it) => Math.max(1, parseInt(it.qty, 10) || 1);
 
   function toast(msg) {
     const t = document.getElementById('toast');
@@ -29,6 +30,7 @@
   function fillLists() {
     document.getElementById('dl-design').innerHTML = settings.designs.map((d) => `<option value="${esc(d)}">`).join('');
     document.getElementById('dl-glass').innerHTML = settings.glass.map((d) => `<option value="${esc(d)}">`).join('');
+    document.getElementById('dl-colour').innerHTML = settings.colours.map((d) => `<option value="${esc(d)}">`).join('');
   }
 
   // ---------- saving ----------
@@ -76,9 +78,14 @@
     return {
       id: uid(), type: typeKey, code: nextCode(j, typeKey),
       w: ['', '', ''], h: ['', '', ''],
-      design: '', glass: '', remarks: '', photo: null,
+      location: '', qty: 1, colour: lastColour(j), design: '', glass: '', remarks: '', photo: null,
       final: null, approved: false, approvedAt: null, approvedSig: null,
     };
+  }
+  // a new item starts with the colour of the item before it (usually the same for the whole site)
+  function lastColour(j) {
+    const prev = (j.items || [])[j.items.length - 1];
+    return prev ? prev.colour || '' : '';
   }
   // measurements changed after approval -> approval no longer valid
   function dropStaleApproval(item) {
@@ -215,6 +222,9 @@
       </div>
       <div class="live" data-live>${liveSummary(it)}</div>
       <div class="grid">
+        <label class="f"><span>Location</span><input data-k="location" value="${esc(it.location)}" placeholder="e.g. Hall, Master bedroom"></label>
+        <label class="f qty"><span>Quantity</span><input inputmode="numeric" pattern="[0-9]*" data-k="qty" value="${esc(it.qty == null ? 1 : it.qty)}"></label>
+        <label class="f"><span>Colour</span><input data-k="colour" list="dl-colour" value="${esc(it.colour)}" placeholder="e.g. White"></label>
         <label class="f"><span>Design</span><input data-k="design" list="dl-design" value="${esc(it.design)}" placeholder="e.g. 2 Track Sliding"></label>
         <label class="f"><span>Glass specification</span><input data-k="glass" list="dl-glass" value="${esc(it.glass)}" placeholder="e.g. 5 mm Toughened Clear"></label>
         <label class="f wide"><span>Remarks</span><textarea data-k="remarks" rows="2" placeholder="Location, opening side, site conditions…">${esc(it.remarks)}</textarea></label>
@@ -279,7 +289,7 @@
     const cls = it.approved ? 'approved' : r.flagged || !r.complete ? 'flagged' : '';
     return `<section class="card rv ${cls}" data-id="${it.id}">
       <div class="rv-head">
-        <b class="rv-code">${esc(it.code)}</b><span class="muted">${esc(typeOf(it.type).label)}${it.design ? ' · ' + esc(it.design) : ''}</span>
+        <b class="rv-code">${esc(it.code)}</b><span class="rv-qty">× ${qtyOf(it)}</span><span class="muted">${esc(typeOf(it.type).label)}${it.location ? ' · ' + esc(it.location) : ''}${it.design ? ' · ' + esc(it.design) : ''}${it.colour ? ' · ' + esc(it.colour) : ''}</span>
         <span class="grow"></span>
         ${it.approved ? `<span class="pill approved">✓ Approved</span>` : r.flagged ? `<span class="pill over">⚠ Over ${settings.toleranceMm} mm</span>` : !r.complete ? `<span class="pill over">Incomplete</span>` : `<span class="pill">Ready</span>`}
       </div>
@@ -324,7 +334,8 @@
   function viewSheet() {
     const items = job.items.filter((i) => i.approved);
     const pending = job.items.length - items.length;
-    const count = (k) => items.filter((i) => i.type === k).length;
+    const count = (k) => items.filter((i) => i.type === k).reduce((a, i) => a + qtyOf(i), 0);
+    const total = items.reduce((a, i) => a + qtyOf(i), 0);
     $app.innerHTML = `
       <div class="noprint">${steps('sheet')}</div>
       <div class="head noprint">
@@ -345,18 +356,18 @@
           </table>
         </header>
         <table class="sh-table">
-          <thead><tr><th>#</th><th>Code</th><th>Type</th><th class="num">Width</th><th class="num">Height</th><th>Design</th><th>Glass</th><th>Remarks</th><th>Photo</th></tr></thead>
+          <thead><tr><th>#</th><th>Code</th><th>Type</th><th>Location</th><th class="num">Width</th><th class="num">Height</th><th class="num">Qty</th><th>Design</th><th>Colour</th><th>Glass</th><th>Remarks</th><th>Photo</th></tr></thead>
           <tbody>
             ${items.map((it, i) => `<tr>
-              <td>${i + 1}</td><td><b>${esc(it.code)}</b></td><td>${esc(typeOf(it.type).label)}</td>
-              <td class="num"><b>${esc(it.final.w)}</b></td><td class="num"><b>${esc(it.final.h)}</b></td>
-              <td>${esc(it.design)}</td><td>${esc(it.glass)}</td><td>${esc(it.remarks)}</td>
+              <td>${i + 1}</td><td><b>${esc(it.code)}</b></td><td>${esc(typeOf(it.type).label)}</td><td>${esc(it.location)}</td>
+              <td class="num"><b>${esc(it.final.w)}</b></td><td class="num"><b>${esc(it.final.h)}</b></td><td class="num"><b>${qtyOf(it)}</b></td>
+              <td>${esc(it.design)}</td><td>${esc(it.colour)}</td><td>${esc(it.glass)}</td><td>${esc(it.remarks)}</td>
               <td>${it.photo ? `<img src="${it.photo}" alt="">` : ''}</td>
-            </tr>`).join('') || `<tr><td colspan="9" class="empty">No approved items yet.</td></tr>`}
+            </tr>`).join('') || `<tr><td colspan="12" class="empty">No approved items yet.</td></tr>`}
           </tbody>
         </table>
         <footer class="sh-foot">
-          <span>Total: <b>${items.length}</b> (${C.types.map((t) => `${esc(t.label)}s ${count(t.key)}`).join(', ')}) · All sizes in mm</span>
+          <span>Total quantity: <b>${total}</b> (${C.types.map((t) => `${esc(t.label)}s ${count(t.key)}`).join(', ')}) · All sizes in mm</span>
           <span>Approved ${items.length ? fmtDate(items.map((i) => i.approvedAt).sort().pop()) : ''}</span>
         </footer>
         <div class="sh-sign"><div>Measured by</div><div>Approved by</div><div>Production in-charge</div></div>
@@ -382,6 +393,7 @@
         <label class="f"><span>Most allowed difference between the 3 measurements (mm)</span><input inputmode="numeric" data-set="toleranceMm" value="${settings.toleranceMm}"></label>
         <label class="f"><span>Design suggestions (one per line)</span><textarea rows="8" data-set="designs">${esc(settings.designs.join('\n'))}</textarea></label>
         <label class="f"><span>Glass suggestions (one per line)</span><textarea rows="8" data-set="glass">${esc(settings.glass.join('\n'))}</textarea></label>
+        <label class="f"><span>Colour suggestions (one per line)</span><textarea rows="6" data-set="colours">${esc(settings.colours.join('\n'))}</textarea></label>
         <div class="actions"><button class="btn gold" data-act="save-settings">Save settings</button></div>
       </section>
       <section class="card">
@@ -443,6 +455,7 @@
       return touch();
     }
     if (el.dataset.k && el.dataset.k !== 'type') {
+      if (el.dataset.k === 'qty') el.value = el.value.replace(/\D/g, '');
       it[el.dataset.k] = el.value;
       if (el.dataset.k === 'code') {
         const dup = dupCodes(job);
@@ -534,7 +547,7 @@
     const tol = Number(get('toleranceMm'));
     if (!(tol >= 0)) return alert('Enter the difference in mm.');
     const lines = (s) => s.split('\n').map((x) => x.trim()).filter(Boolean);
-    settings = { toleranceMm: tol, designs: lines(get('designs')), glass: lines(get('glass')) };
+    settings = { toleranceMm: tol, designs: lines(get('designs')), glass: lines(get('glass')), colours: lines(get('colours')) };
     await DB.set('settings', settings); fillLists(); toast('Settings saved');
   }
   async function exportBackup() {

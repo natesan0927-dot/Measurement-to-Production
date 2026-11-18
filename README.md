@@ -10,6 +10,7 @@ Site measurement → approval → production sheet, for TITANS WINDOWS.
    For each item enter:
    - 3 widths: **left, centre, right**
    - 3 heights: **top, middle, bottom**
+   - location, quantity, colour (a new item starts with the colour of the one before)
    - design, glass specification, remarks and a photo (optional)
 
    The card shows the least size and the difference straight away, in red if it is more than 8 mm.
@@ -20,10 +21,10 @@ Site measurement → approval → production sheet, for TITANS WINDOWS.
    - The production size can be edited in place before approving.
    - *Approve all within 8 mm* approves every item that is complete and within the limit.
    - If a measurement is changed later, that item's approval is dropped and it has to be approved again.
-4. **Production sheet** – lists the approved items with the final width × height, design, glass, remarks and photo,
+4. **Production sheet** – lists the approved items with location, final width × height, quantity, design, colour, glass, remarks and photo, and the total quantity,
    ready to print or save as PDF (A4 landscape) for the factory.
 
-The 8 mm limit and the design / glass suggestion lists can be changed under **Settings**.
+The 8 mm limit and the design / colour / glass suggestion lists can be changed under **Settings**.
 
 ## Where the data is kept
 
