@@ -2,6 +2,9 @@
 
 Site measurement → approval → production sheet, for TITANS WINDOWS.
 
+**Online app: https://measurement-to-production.vercel.app** (Vercel; pushing to `main` on GitHub updates it).
+On a phone, open it and choose *Add to Home screen* to install it as an app.
+
 ## How it works
 
 1. **Jobs** – start a new job for each site visit (job numbers M2P-0001, M2P-0002, …).
@@ -45,5 +48,4 @@ as an app on a phone ("Add to Home screen"). Use *Settings → Download backup* 
 
 ## Running it
 
-It is a plain static site: no build step. Put it on Vercel (or any static host) by importing this repository,
-or test it on a PC with `python -m http.server 8000` and open http://localhost:8000.
+It is a plain static site: no build step. It runs on Vercel from this repository. To make changes, test it on a PC with `python -m http.server 8000` and open http://localhost:8000.
