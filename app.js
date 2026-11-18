@@ -463,7 +463,7 @@
     const box = document.createElement('div');
     box.className = 'kp-back';
     box.innerHTML = `<div class="keypad" role="dialog" aria-label="Design">
-      <div class="kp-top"><div class="kp-draw" data-kp-draw></div><div class="kp-title"><b>${esc(it.code)} design</b><input data-kp-text value="${esc(it.design)}" placeholder="Tap the codes below"></div></div>
+      <div class="kp-top"><div class="kp-title"><b>${esc(it.code)} design</b><input data-kp-text value="${esc(it.design)}" placeholder="Tap the codes below"></div></div>
       <div class="kp-bar"><span class="muted" data-kp-hint>Tap codes to build the design</span><button class="btn small ghost" data-kp-edit>✎ Edit codes</button></div>
       <div class="kp-keys" data-kp-keys></div>
       <div class="kp-form" data-kp-form hidden>
@@ -476,10 +476,7 @@
     document.body.appendChild(box);
     const $ = (sel) => box.querySelector(sel);
     const text = $('[data-kp-text]'), form = $('[data-kp-form]');
-    const draw = () => {
-      const [w, h] = drawSize(it);
-      $('[data-kp-draw]').innerHTML = it.design ? DRAW.svg(it.design, w, h) : '<span>Drawing appears here</span>';
-    };
+    const draw = () => {};   // no drawing while measuring
     const set = (v) => { text.value = v; it.design = v; touch(); previewSoon(); updateDesignBtn(it); draw(); };
 
     function drawKeys() {
@@ -551,9 +548,9 @@
     return [r.w.min, r.h.min];
   }
   function designFace(it) {
+    // measurement step: the codes only, no drawing
     if (!it.design) return `<span class="dplus">+</span><span>Design</span>`;
-    const [w, h] = drawSize(it);
-    return `${DRAW.svg(it.design, w, h, { cls: 'dsvg' })}<span class="dcode">${esc(it.design)}</span>`;
+    return `<span class="dcode">${esc(it.design)}</span>`;
   }
 
   // ================= Review & approve =================
