@@ -16,7 +16,7 @@
   let tab = 'review';    // what the right-hand side shows on a wide screen: 'review' or 'sheet'
   let previewTimer = null;
   let siteOpen = null;           // site details open or folded to one line (null: decide by itself)
-  const openRows = new Set();   // rows whose details (quantity, remarks, type, move, delete) are open
+  const openRows = new Set();   // rows whose details (remarks, site photos, type, move, delete) are open
   // one step at a time on every screen (measurement -> approval -> production sheet)
   const wide = () => false;
   const allApproved = (j) => j.items.length > 0 && j.items.every((i) => i.approved);
@@ -29,7 +29,6 @@
   const fmtDate = (d) => { if (!d) return ''; const [y, m, dd] = d.slice(0, 10).split('-'); return `${dd}-${m}-${y}`; };
   const typeOf = (key) => C.types.find((t) => t.key === key) || C.types[0];
   const mm = (v) => (v == null || v === '' ? '–' : `${v}`);
-  const qtyOf = (it) => Math.max(1, parseInt(it.qty, 10) || 1);
 
   function toast(msg) {
     const t = document.getElementById('toast');
@@ -88,7 +87,7 @@
     return {
       id: uid(), type: typeKey, code: nextCode(j, typeKey),
       w: ['', '', ''], h: ['', '', ''],
-      location: '', qty: 1, colour: settings.defaults.colour, design: '', glass: defaultGlass(typeKey), section: defaultSection(typeKey), remarks: '',
+      location: '', colour: settings.defaults.colour, design: '', glass: defaultGlass(typeKey), section: defaultSection(typeKey), remarks: '',
       final: null, approved: false, approvedAt: null, approvedSig: null,
     };
   }
@@ -144,11 +143,11 @@
     if (inJob) {
       const n = job.items.length, ok = job.items.filter((i) => i.approved).length;
       const over = job.items.filter((i) => RULES.check(i, settings.toleranceMm).flagged && !i.approved).length;
-      const pcs = job.items.filter((i) => i.approved).reduce((a, i) => a + qtyOf(i), 0);
+      const ready = job.items.filter((i) => i.approved).length;
       const st = [
         ['job', 'job', '1 · Measurement', `${n} item${n === 1 ? '' : 's'}${job.sentToReview ? ' · complete' : ''}`, job.sentToReview ? 'done' : '', true],
         ['review', 'review', '2 · Approval', canReview(job) ? `${ok} of ${n} approved${over ? ` · ${over} over ${settings.toleranceMm} mm` : ''}` : 'after measurement', over ? 'warn' : allApproved(job) ? 'done' : '', canReview(job)],
-        ['sheet', 'sheet', '3 · Production sheet', allApproved(job) ? `${pcs} pcs ready` : 'after approval', '', allApproved(job)],
+        ['sheet', 'sheet', '3 · Production sheet', allApproved(job) ? `${ready} item${ready === 1 ? '' : 's'} ready` : 'after approval', '', allApproved(job)],
       ];
       stages = `<div class="navsec">
         <p class="navlabel">Current job</p>
@@ -213,7 +212,7 @@
     job = null;
     const jobs = (await DB.allJobs()).sort((a, b) => (b.updated || '').localeCompare(a.updated || ''));
     const count = (st) => jobs.filter((j) => jobStatus(j) === st).length;
-    const pcs = jobs.reduce((a, j) => a + (j.items || []).filter((i) => i.approved).reduce((x, i) => x + qtyOf(i), 0), 0);
+    const okItems = jobs.reduce((a, j) => a + (j.items || []).filter((i) => i.approved).length, 0);
     const hr = new Date().getHours();
     const hello = hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening';
     const tiles = [
@@ -238,7 +237,7 @@
       </section>
       <div class="stats">
         ${tiles.map(([k, l, n, c]) => `<button class="stat ${c} ${homeFilter === k ? 'on' : ''}" data-act="filter" data-f="${k}"><b>${n}</b><span>${l}</span></button>`).join('')}
-        <div class="stat gold"><b>${pcs}</b><span>Pieces approved</span></div>
+        <div class="stat gold"><b>${okItems}</b><span>Windows approved</span></div>
       </div>
       <div class="listhead">
         <h2>${homeFilter === 'all' ? 'Recent jobs' : esc(tiles.find((t) => t[0] === homeFilter)[1])}</h2>
@@ -269,7 +268,7 @@
       <span class="jc-meta">${esc(j.site || j.address || 'Site not set')} · ${fmtDate(j.date)}</span>
       <div class="jc-codes">${items.slice(0, 6).map((i) => `<span>${esc(i.code)}${i.design ? ' · ' + esc(i.design) : ''}</span>`).join('') || '<span class="muted">No windows yet</span>'}${items.length > 6 ? `<span class="muted">+${items.length - 6} more</span>` : ''}</div>
       <div class="bar"><i style="width:${pct}%"></i></div>
-      <div class="jc-foot"><span><b>${ok}</b>/${n} approved</span>${over ? `<span class="warn">⚠ ${over} over ${settings.toleranceMm} mm</span>` : `<span>${items.reduce((a, i) => a + qtyOf(i), 0)} pcs</span>`}</div>
+      <div class="jc-foot"><span><b>${ok}</b>/${n} approved</span>${over ? `<span class="warn">⚠ ${over} over ${settings.toleranceMm} mm</span>` : ''}</div>
     </a>`;
   }
 
@@ -388,7 +387,7 @@
       <div class="row">
         <div class="codecol">
           <input class="code ${isDup ? 'bad' : ''}" data-k="code" value="${esc(it.code)}" title="${isDup ? 'This code is used twice' : 'Code (you can change it)'}" aria-label="Code">
-          <button class="icon more" data-act="more" title="More: quantity, remarks, type, move, delete">${open ? '▴' : '⋯'}</button>
+          <button class="icon more" data-act="more" title="More: remarks, site photos, type, move, delete">${open ? '▴' : '⋯'}</button>
         </div>
         <div class="trio" data-g="w">${mInput('w', 0, 'Width left', it)}${mInput('w', 1, 'Width centre', it)}${mInput('w', 2, 'Width right', it)}</div>
         <div class="trio" data-g="h">${mInput('h', 0, 'Height top', it)}${mInput('h', 1, 'Height middle', it)}${mInput('h', 2, 'Height bottom', it)}</div>
@@ -403,7 +402,6 @@
       <div class="rowsub"><span data-status>${rowStatus(it)}</span><span class="muted" data-sub>${esc(sub)}</span><span data-pill>${it.approved ? `<span class="pill approved">Approved</span>` : ''}</span></div>
       <div class="details" ${open ? '' : 'hidden'}>
         <div class="grid">
-          <label class="f"><span>Quantity</span><input inputmode="numeric" pattern="[0-9]*" data-k="qty" value="${esc(it.qty == null ? 1 : it.qty)}"></label>
           <label class="f wide"><span>Remarks</span><textarea data-k="remarks" rows="2" placeholder="Opening side, site conditions…">${esc(it.remarks)}</textarea></label>
         </div>
         <div class="sitephotos">
@@ -454,7 +452,7 @@
   }
   function rowSubText(it) {
     const n = (it.photos || []).length;
-    return [qtyOf(it) > 1 ? `Qty ${qtyOf(it)}` : '', n ? `📷 ${n} site photo${n === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ');
+    return n ? `📷 ${n} site photo${n === 1 ? '' : 's'}` : '';
   }
   // ---------- site photos ----------
   const PH_MARK = { done: ['✓', 'Uploaded'], waiting: ['↑', 'Waiting for internet to upload'], failed: ['!', 'Upload failed, will try again'] };
@@ -633,7 +631,7 @@
     const cls = it.approved ? 'approved' : r.flagged || !r.complete ? 'flagged' : '';
     return `<section class="card rv ${cls}" data-id="${it.id}">
       <div class="rv-head">
-        <b class="rv-code">${esc(it.code)}</b><span class="rv-qty">× ${qtyOf(it)}</span><span class="muted">${esc(typeOf(it.type).label)}${it.location ? ' · ' + esc(it.location) : ''}${it.section ? ' · ' + esc(it.section) : ''}${it.design ? ' · ' + esc(it.design) : ''}${it.colour ? ' · ' + esc(it.colour) : ''}</span>
+        <b class="rv-code">${esc(it.code)}</b><span class="muted">${esc(typeOf(it.type).label)}${it.location ? ' · ' + esc(it.location) : ''}${it.section ? ' · ' + esc(it.section) : ''}${it.design ? ' · ' + esc(it.design) : ''}${it.colour ? ' · ' + esc(it.colour) : ''}</span>
         <span class="grow"></span>
         ${it.approved ? `<span class="pill approved">✓ Approved</span>` : r.flagged ? `<span class="pill over">⚠ Over ${settings.toleranceMm} mm</span>` : !r.complete ? `<span class="pill over">Incomplete</span>` : `<span class="pill">Ready</span>`}
       </div>
@@ -699,23 +697,23 @@
   function sheetHtml() {
     const install = sheetKind === 'install';
     const items = job.items.filter((i) => i.approved);
-    const count = (k) => items.filter((i) => i.type === k).reduce((a, i) => a + qtyOf(i), 0);
-    const total = items.reduce((a, i) => a + qtyOf(i), 0);
+    const count = (k) => items.filter((i) => i.type === k).length;
+    const total = items.length;
     const waiting = items.reduce((a, i) => a + (i.photos || []).filter((p) => p.status !== 'done').length, 0);
     const cols = install
-      ? ['Code', 'Location', ['Width', 'num'], ['Height', 'num'], ['Qty', 'num'], 'Section', 'Design', 'Colour', 'Glass', 'Remarks']
-      : ['Code', ['Width', 'num'], ['Height', 'num'], ['Qty', 'num'], 'Section', 'Design', 'Colour', 'Glass', 'Remarks', ['Cutting sizes <small>(filled by production)</small>', 'cutth']];
+      ? ['Code', 'Location', ['Width', 'num'], ['Height', 'num'], 'Section', 'Design', 'Colour', 'Glass', 'Remarks']
+      : ['Code', ['Width', 'num'], ['Height', 'num'], 'Section', 'Design', 'Colour', 'Glass', 'Remarks', ['Cutting sizes <small>(filled by production)</small>', 'cutth']];
     const head = cols.map((c) => Array.isArray(c) ? `<th class="${c[1]}">${c[0]}</th>` : `<th>${c}</th>`).join('');
     const row = (it) => install
       ? `<tr class="has-sub">
           <td><b>${esc(it.code)}</b></td><td>${esc(it.location)}</td>
-          <td class="num"><b>${esc(it.final.w)}</b></td><td class="num"><b>${esc(it.final.h)}</b></td><td class="num"><b>${qtyOf(it)}</b></td>
+          <td class="num"><b>${esc(it.final.w)}</b></td><td class="num"><b>${esc(it.final.h)}</b></td>
           <td>${esc(it.section)}</td><td class="sh-design"><b>${esc(it.design)}</b></td><td>${esc(it.colour)}</td><td>${esc(it.glass)}</td><td>${esc(it.remarks)}</td>
         </tr>
         <tr class="phrow"><td colspan="${cols.length}">${photoLine(it)}</td></tr>`
       : `<tr>
           <td><b>${esc(it.code)}</b></td>
-          <td class="num"><b>${esc(it.final.w)}</b></td><td class="num"><b>${esc(it.final.h)}</b></td><td class="num"><b>${qtyOf(it)}</b></td>
+          <td class="num"><b>${esc(it.final.w)}</b></td><td class="num"><b>${esc(it.final.h)}</b></td>
           <td>${esc(it.section)}</td><td class="sh-design"><b>${esc(it.design)}</b></td><td>${esc(it.colour)}</td><td>${esc(it.glass)}</td><td>${esc(it.remarks)}</td>
           <td class="cut"><div class="cutboxes"><span></span><span></span><span></span><span></span></div></td>
         </tr>`;
@@ -736,7 +734,7 @@
           <tbody>${items.map(row).join('') || `<tr><td colspan="${cols.length}" class="empty">No approved items yet.</td></tr>`}</tbody>
         </table>
         <footer class="sh-foot">
-          <span>Total quantity: <b>${total}</b> (${C.types.map((t) => `${esc(t.label)}s ${count(t.key)}`).join(', ')}) · All sizes in mm</span>
+          <span>Total: <b>${total}</b> (${C.types.map((t) => `${esc(t.label)}s ${count(t.key)}`).join(', ')}) · All sizes in mm</span>
           <span>Approved ${items.length ? fmtDate(items.map((i) => i.approvedAt).sort().pop()) : ''}</span>
         </footer>
         <div class="sh-sign">${install ? '<div>Installed by</div><div>Customer signature</div><div>Date of installation</div>' : '<div>Measured by</div><div>Approved by</div><div>Production in-charge</div>'}</div>
@@ -853,7 +851,6 @@
       return touch();
     }
     if (el.dataset.k && el.dataset.k !== 'type' && el.value !== '__other') {
-      if (el.dataset.k === 'qty') el.value = el.value.replace(/\D/g, '');
       it[el.dataset.k] = el.value;
       const card = el.closest('.item');
       if (card) rowSub(card, it);

@@ -20,7 +20,7 @@ On a phone, open it and choose *Add to Home screen* to install it as an app.
      Section: **Inventa** for a window, **Optima** for a ventilator as standard. A new item starts as **White**,
      with **5 mm Clear** glass for a window and **5 mm Pinned** for a ventilator; pick another from the list (locations: Hall, Kitchen, Master bedroom, …),
      or **Other…** to type a new one (it is then kept in the list). The starting colour and glass, and the location / colour / glass lists, can be changed under Settings.
-   - **⋯** opens the rest: quantity, remarks, **site photos**, type, move and delete.
+   - **⋯** opens the rest: remarks, **site photos**, type, move and delete.
      Site photos (optional, for the installation team) are kept on the phone and uploaded to Supabase as soon
      as there is internet: ↑ waiting, ✓ uploaded.
 
@@ -39,12 +39,12 @@ when the one before is done (the sidebar shows them, locked until then).
    - *Approve all within 8 mm* approves every item that is complete and within the limit.
    - If a measurement is changed later, that item's approval is dropped and it has to be approved again.
    - **Generate production sheet** opens only when every item is approved.
-4. **Production sheet** – lists the approved items: code, final width × height, quantity, section, design, colour, glass and remarks,
-   with **4 empty boxes per window for the cutting sizes** the production team works out and writes in by hand, and the total quantity,
+4. **Production sheet** – lists the approved items: code, final width × height, section, design, colour, glass and remarks,
+   with **4 empty boxes per window for the cutting sizes** the production team works out and writes in by hand, and the total,
    ready to print or save as PDF (A4 landscape) for the factory.
 
 **Two production sheets** (switch at the top of step 3):
-- **Factory sheet**: code, size, qty, section, design, colour, glass, remarks and 4 large boxes per window
+- **Factory sheet**: code, size, section, design, colour, glass, remarks and 4 large boxes per window
   for the cutting sizes, written in by hand.
 - **Installation sheet**: the same plus location, and under each window a **link and QR code to its site photos**.
   Installers open it on any phone with no login (`photos.html`).
