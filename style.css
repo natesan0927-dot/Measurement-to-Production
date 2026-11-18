@@ -609,3 +609,8 @@ button.stat:hover { transform: translateY(-2px); border-color: var(--border-stro
 .rv-body .mt { order: 1; }
 .rv-body .rv-info { order: 2; }
 .rv-body .final { order: 3; margin-left: auto; align-self: flex-start; }
+
+/* production size: its own colour (blue), not the yellow of the least measurements; green once approved */
+.final-in input { background: #E8EDFF; border: 2px solid var(--navy-600); color: var(--navy-800); }
+.final-in input:focus { border-color: var(--navy-800); box-shadow: 0 0 0 4px rgba(36,48,133,.18); }
+.final-in input:disabled { background: var(--good-bg); border-color: var(--good); color: var(--good); }
