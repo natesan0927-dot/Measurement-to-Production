@@ -604,3 +604,8 @@ button.stat:hover { transform: translateY(-2px); border-color: var(--border-stro
   .sh-table tbody tr.has-sub td { border-bottom: 0 !important; }
   .sh-table tbody tr:last-child td { border-bottom: 0.6mm solid #000 !important; }
 }
+
+/* approval card: measurements | specifications in the centre | production size + approve on the right */
+.rv-body .mt { order: 1; }
+.rv-body .rv-info { order: 2; }
+.rv-body .final { order: 3; margin-left: auto; align-self: flex-start; }
