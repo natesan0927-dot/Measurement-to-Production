@@ -22,11 +22,16 @@ window.CONFIG = {
     ['FIX', 'Fixed'], ['VENT', 'Ventilator'], ['FAN', 'Exhaust fan'], ['MESH', 'Mosquito mesh'],
     ['DOOR', 'Door'], ['LOUV', 'Louvers'], ['T&T', 'Tilt & turn'], ['ARCH', 'Arch'],
   ],
+  // What a new item starts with (can be changed on each item, and here under Settings in the app)
+  defaults: {
+    colour: 'White',
+    glass: { W: '5 mm Clear', V: '5 mm Pinned' },   // windows / ventilators
+  },
   colours: [
     'White', 'Ivory', 'Golden Oak', 'Walnut', 'Mahogany', 'Anthracite Grey', 'Black', 'White inside / Golden Oak outside',
   ],
   glass: [
-    '5 mm Clear', '6 mm Clear', '5 mm Frosted', '5 mm Toughened Clear', '6 mm Toughened Clear',
+    '5 mm Clear', '5 mm Pinned', '6 mm Clear', '5 mm Frosted', '5 mm Toughened Clear', '6 mm Toughened Clear',
     '8 mm Toughened Clear', '5 mm Reflective', '6+12+6 DGU', '5 mm Laminated',
   ],
 };

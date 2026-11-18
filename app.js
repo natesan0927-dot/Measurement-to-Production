@@ -8,7 +8,8 @@
 (function () {
   const C = window.CONFIG;
   const $app = document.getElementById('app');
-  let settings = { toleranceMm: C.toleranceMm, keys: C.designKeys.map((x) => x.slice()), glass: C.glass.slice(), colours: C.colours.slice() };
+  let settings = { toleranceMm: C.toleranceMm, keys: C.designKeys.map((x) => x.slice()), glass: C.glass.slice(), colours: C.colours.slice(),
+    defaults: { colour: C.defaults.colour, glass: Object.assign({}, C.defaults.glass) } };
   let job = null;        // the job open right now
   let saveTimer = null;
   let pane = 'job';      // what a phone shows: 'job' (measurements), 'review' or 'sheet'
@@ -84,15 +85,12 @@
     return {
       id: uid(), type: typeKey, code: nextCode(j, typeKey),
       w: ['', '', ''], h: ['', '', ''],
-      location: '', qty: 1, colour: lastColour(j), design: '', glass: '', remarks: '', photo: null,
+      location: '', qty: 1, colour: settings.defaults.colour, design: '', glass: defaultGlass(typeKey), remarks: '', photo: null,
       final: null, approved: false, approvedAt: null, approvedSig: null,
     };
   }
-  // a new item starts with the colour of the item before it (usually the same for the whole site)
-  function lastColour(j) {
-    const prev = (j.items || [])[j.items.length - 1];
-    return prev ? prev.colour || '' : '';
-  }
+  // a new item starts as White, with 5 mm Clear glass for a window and 5 mm Pinned for a ventilator
+  const defaultGlass = (typeKey) => settings.defaults.glass[typeKey] || settings.defaults.glass.W || '';
   // measurements changed after approval -> approval no longer valid
   function dropStaleApproval(item) {
     if (item.approved && item.approvedSig !== RULES.signature(item)) {
@@ -325,7 +323,7 @@
   function itemCard(it, idx, dup) {
     const isDup = dup && dup.has(String(it.code).trim().toUpperCase());
     const open = openRows.has(it.id);
-    const sub = [it.location, qtyOf(it) > 1 ? `× ${qtyOf(it)}` : '', it.colour, it.glass].filter(Boolean).join(' · ');
+    const sub = qtyOf(it) > 1 ? `Qty ${qtyOf(it)}` : '';
     return `<section class="item ${it.type === 'V' ? 'vent' : ''} ${open ? 'open' : ''}" data-id="${it.id}">
       <div class="row">
         <div class="codecol">
@@ -336,13 +334,15 @@
         <div class="trio" data-g="h">${mInput('h', 0, 'Height top', it)}${mInput('h', 1, 'Height middle', it)}${mInput('h', 2, 'Height bottom', it)}</div>
         <button class="design ${it.design ? '' : 'empty'}" data-act="keypad" title="Design">${it.design ? esc(it.design) : 'Design'}</button>
       </div>
+      <div class="specs">
+        <label class="sf"><span>Location</span><input data-k="location" value="${esc(it.location)}" placeholder="e.g. Hall"></label>
+        <label class="sf"><span>Colour</span>${pick('colour', it.colour, settings.colours)}</label>
+        <label class="sf"><span>Glass</span>${pick('glass', it.glass, settings.glass)}</label>
+      </div>
       <div class="rowsub"><span data-status>${rowStatus(it)}</span><span class="muted" data-sub>${esc(sub)}</span><span data-pill>${it.approved ? `<span class="pill approved">Approved</span>` : ''}</span></div>
       <div class="details" ${open ? '' : 'hidden'}>
         <div class="grid">
-          <label class="f"><span>Location</span><input data-k="location" value="${esc(it.location)}" placeholder="e.g. Hall, Master bedroom"></label>
           <label class="f"><span>Quantity</span><input inputmode="numeric" pattern="[0-9]*" data-k="qty" value="${esc(it.qty == null ? 1 : it.qty)}"></label>
-          <label class="f"><span>Colour</span><input data-k="colour" list="dl-colour" value="${esc(it.colour)}" placeholder="e.g. White"></label>
-          <label class="f"><span>Glass specification</span><input data-k="glass" list="dl-glass" value="${esc(it.glass)}" placeholder="e.g. 5 mm Toughened Clear"></label>
           <label class="f wide"><span>Remarks</span><textarea data-k="remarks" rows="2" placeholder="Opening side, site conditions…">${esc(it.remarks)}</textarea></label>
         </div>
         <div class="photo">
@@ -356,6 +356,11 @@
         </div>
       </div>
     </section>`;
+  }
+  // a drop-down of the usual choices; "Other…" lets anything else be typed (and keeps it in the list)
+  function pick(key, val, list) {
+    const all = val && !list.includes(val) ? [val, ...list] : list;
+    return `<select data-k="${key}">${val ? '' : '<option value="" selected>–</option>'}${all.map((x) => `<option ${x === val ? 'selected' : ''}>${esc(x)}</option>`).join('')}<option value="__other">Other…</option></select>`;
   }
   function mInput(dim, i, label, it) {
     const tag = 'LCRTMB'[dim === 'w' ? i : i + 3];
@@ -382,7 +387,7 @@
     card.querySelector('[data-status]').innerHTML = rowStatus(it);
   }
   function rowSub(card, it) {
-    card.querySelector('[data-sub]').textContent = [it.location, qtyOf(it) > 1 ? `× ${qtyOf(it)}` : '', it.colour, it.glass].filter(Boolean).join(' · ');
+    card.querySelector('[data-sub]').textContent = qtyOf(it) > 1 ? `Qty ${qtyOf(it)}` : '';
   }
 
   // ---------- design key pad ----------
@@ -529,16 +534,11 @@
       ${it.glass || it.remarks ? `<p class="rv-note">${it.glass ? `<b>Glass:</b> ${esc(it.glass)} ` : ''}${it.remarks ? `<b>Remarks:</b> ${esc(it.remarks)}` : ''}</p>` : ''}
     </section>`;
   }
-  function approveItem(it, force) {
+  function approveItem(it) {
     const r = RULES.check(it, settings.toleranceMm);
     if (!r.complete) return false;
     const fw = it.final ? Number(it.final.w) : r.w.min, fh = it.final ? Number(it.final.h) : r.h.min;
     if (!(fw > 0 && fh > 0)) { alert(`${it.code}: enter the production width and height.`); return false; }
-    if (r.flagged && !force) {
-      const msg = `${it.code}: the measurements differ by more than ${settings.toleranceMm} mm` +
-        ` (width ${r.w.diff} mm, height ${r.h.diff} mm).\n\nApprove ${fw} × ${fh} anyway?`;
-      if (!confirm(msg)) return false;
-    }
     it.final = { w: fw, h: fh };
     it.approved = true; it.approvedAt = new Date().toISOString(); it.approvedSig = RULES.signature(it);
     return true;
@@ -600,6 +600,11 @@
       <div class="head"><div><h1>Settings</h1><p class="sub">Saved on this device.</p></div></div>
       <section class="card">
         <label class="f"><span>Most allowed difference between the 3 measurements (mm)</span><input inputmode="numeric" data-set="toleranceMm" value="${settings.toleranceMm}"></label>
+        <div class="grid">
+          <label class="f"><span>Colour for a new item</span>${defPick('dcolour', settings.defaults.colour, settings.colours)}</label>
+          <label class="f"><span>Glass for a new window</span>${defPick('dglassW', settings.defaults.glass.W, settings.glass)}</label>
+          <label class="f"><span>Glass for a new ventilator</span>${defPick('dglassV', settings.defaults.glass.V, settings.glass)}</label>
+        </div>
         <div class="f"><span>Design codes (the keys on the design key pad)</span>
           <div class="keylist" data-keylist>${settings.keys.map(([k, t]) => keyRow(k, t)).join('')}</div>
           <div><button class="btn small" data-act="key-add">+ Add code</button></div>
@@ -618,6 +623,10 @@
       </section>`;
   }
 
+  function defPick(key, val, list) {
+    const all = val && !list.includes(val) ? [val, ...list] : list;
+    return `<select data-set="${key}">${all.map((x) => `<option ${x === val ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select>`;
+  }
   function keyRow(k = '', t = '') {
     return `<div class="keyrow"><input data-key-k value="${esc(k)}" maxlength="8" placeholder="Code" aria-label="Code"><input data-key-t value="${esc(t)}" placeholder="What it means" aria-label="What it means"><button class="icon danger" data-act="key-del" title="Delete">✕</button></div>`;
   }
@@ -675,7 +684,7 @@
       it.final[el.dataset.final] = el.value.replace(/[^\d.]/g, '');
       return touch();
     }
-    if (el.dataset.k && el.dataset.k !== 'type') {
+    if (el.dataset.k && el.dataset.k !== 'type' && el.value !== '__other') {
       if (el.dataset.k === 'qty') el.value = el.value.replace(/\D/g, '');
       it[el.dataset.k] = el.value;
       const card = el.closest('.item');
@@ -697,7 +706,20 @@
     if (el.matches('[data-import]')) return importBackup(el.files[0]);
     if (!job) return;
     const it = itemOf(el);
+    if (el.value === '__other' && it && (el.dataset.k === 'colour' || el.dataset.k === 'glass')) {
+      const what = el.dataset.k === 'glass' ? 'glass' : 'colour';
+      const v = (prompt(`Type the ${what}:`) || '').trim();
+      if (v) {
+        it[el.dataset.k] = v;
+        const list = what === 'glass' ? settings.glass : settings.colours;
+        if (!list.includes(v)) { list.push(v); DB.set('settings', settings); }
+        touch(); previewSoon();
+      }
+      el.closest('.sf').innerHTML = `<span>${what === 'glass' ? 'Glass' : 'Colour'}</span>${pick(el.dataset.k, it[el.dataset.k], what === 'glass' ? settings.glass : settings.colours)}`;
+      return;
+    }
     if (el.dataset.k === 'type' && it) {
+      if (it.glass === defaultGlass(it.type)) it.glass = defaultGlass(el.value);
       it.type = el.value;
       if (confirm(`Change the code to ${nextCode(job, el.value)}?`)) it.code = nextCode(job, el.value);
       touch(); viewWork();
@@ -777,7 +799,7 @@
     }
     if (act === 'approve-ok') {
       let n = 0;
-      job.items.forEach((x) => { const r = RULES.check(x, settings.toleranceMm); if (!x.approved && r.complete && !r.flagged && approveItem(x, true)) n++; });
+      job.items.forEach((x) => { const r = RULES.check(x, settings.toleranceMm); if (!x.approved && r.complete && !r.flagged && approveItem(x)) n++; });
       touch(); renderPreview(); refreshCardPills(); showFootOnly(); toast(n ? `${n} approved` : 'Nothing to approve');
     }
     if (act === 'to-sheet') { await saveNow(); tab = 'sheet'; if (wide()) showPane(); else location.hash = `#/sheet/${job.id}`; }
@@ -803,7 +825,8 @@
       .filter(([k]) => k);
     const seen = new Set(), twice = keys.filter(([k]) => (seen.has(k) ? true : (seen.add(k), false))).map(([k]) => k);
     if (twice.length) return alert('These codes are there twice: ' + twice.join(', '));
-    settings = { toleranceMm: tol, keys, glass: lines(get('glass')), colours: lines(get('colours')) };
+    const defaults = { colour: get('dcolour'), glass: { W: get('dglassW'), V: get('dglassV') } };
+    settings = { defaults, toleranceMm: tol, keys, glass: lines(get('glass')), colours: lines(get('colours')) };
     await DB.set('settings', settings); fillLists(); toast('Settings saved');
   }
   async function exportBackup() {
@@ -830,7 +853,8 @@
   // ---------- start ----------
   (async function start() {
     const s = await DB.get('settings');
-    if (s) settings = Object.assign(settings, s);
+    if (s) settings = Object.assign(settings, s, { defaults: Object.assign({}, settings.defaults, s.defaults || {}) });
+    if (!settings.glass.includes('5 mm Pinned')) settings.glass.splice(1, 0, '5 mm Pinned');
     fillLists();
     route();
   })();

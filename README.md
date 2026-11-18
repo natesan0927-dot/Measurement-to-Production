@@ -14,8 +14,10 @@ On a phone, open it and choose *Add to Home screen* to install it as an app.
    - **Design** opens a key pad: tap SL, OP, TH, BH, FIX, VENT, FAN, MESH, DOOR … to draft it (e.g. `SL SL MESH`, `OP FIX OP`).
      New codes can be added right in the key pad (**+ New code**), and **✎ Edit codes** changes or deletes them.
      They can also be managed under Settings.
-   - **⋯** opens the rest: location, quantity, colour (a new item starts with the colour of the one before),
-     glass specification, remarks, photo, type, move and delete.
+   - **Location, colour and glass** are always shown under the measurements. A new item starts as **White**,
+     with **5 mm Clear** glass for a window and **5 mm Pinned** for a ventilator; pick another from the list,
+     or **Other…** to type a new one (it is then kept in the list). The starting colour and glass can be changed under Settings.
+   - **⋯** opens the rest: quantity, remarks, photo, type, move and delete.
 
    Under each line the least size and the difference show straight away; the least boxes turn yellow
    and a set that differs by more than 8 mm turns red.
@@ -25,7 +27,7 @@ updating as you type (like the quotation software). On a phone they are shown on
 
 3. **Review & approve** – *Proceed to production sheet* shows every item with its 3+3 measurements.
    - The **least width and least height** are highlighted and offered as the production size.
-   - If the measurements differ by **more than 8 mm** (largest − smallest), the item is shown in red and asks for confirmation before approving.
+   - If the measurements differ by **more than 8 mm** (largest − smallest), the item is shown in red. It can still be approved with one tap.
    - The production size can be edited in place before approving.
    - *Approve all within 8 mm* approves every item that is complete and within the limit.
    - If a measurement is changed later, that item's approval is dropped and it has to be approved again.
