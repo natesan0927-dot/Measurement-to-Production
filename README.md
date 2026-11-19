@@ -3,7 +3,8 @@
 Site measurement → approval → production sheet, for TITANS WINDOWS.
 
 **Online app: https://measurement-to-production.vercel.app** (Vercel; pushing to `main` on GitHub updates it).
-On a phone, open it and choose *Add to Home screen* to install it as an app.
+**Mobile app:** open the link on the phone and tap **📲 Install M2P app** (Android), or Share → *Add to Home Screen*
+(iPhone). It installs with the **M2P** icon, opens full screen and works without internet. Icon source: `assets/src/m2p-icon.html`.
 
 ## How it works
 

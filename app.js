@@ -1270,6 +1270,23 @@
     } catch (err) { alert('Could not restore: ' + err.message); }
   }
 
+  // ---------- install as an app (M2P icon on the home screen) ----------
+  (function installButton() {
+    const btn = document.getElementById('installApp');
+    const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+    if (!btn || standalone) return;
+    let deferred = null;
+    window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferred = e; btn.hidden = false; });
+    window.addEventListener('appinstalled', () => { btn.hidden = true; toast('M2P app installed'); });
+    const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    if (ios) btn.hidden = false;   // iPhone has no install prompt: show how
+    btn.addEventListener('click', async () => {
+      if (deferred) { deferred.prompt(); await deferred.userChoice; deferred = null; return; }
+      alert(ios ? 'To install M2P on iPhone:\n\n1. Tap the Share button (square with an arrow) in Safari\n2. Tap "Add to Home Screen", then "Add"'
+                : 'To install M2P: open the browser menu (⋮) and tap "Install app" or "Add to Home screen".');
+    });
+  })();
+
   // ---------- start ----------
   (async function start() {
     const s = await DB.get('settings');
