@@ -709,3 +709,6 @@ button.stat:hover { transform: translateY(-2px); border-color: var(--border-stro
   .sheet .hdr .co { font-size: 28px; }
   .sheet .hdr .meta > div { font-size: 10.5pt; }
 }
+
+/* the company name in Cinzel, as in the quotation software's quote header */
+.brand b { font-family: "Cinzel", "Times New Roman", serif !important; font-weight: 700; letter-spacing: .05em; }
