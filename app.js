@@ -40,6 +40,12 @@
     t.textContent = msg; t.hidden = false;
     clearTimeout(toast._t); toast._t = setTimeout(() => (t.hidden = true), 2200);
   }
+  function toastUndo(msg, undo) {
+    const t = document.getElementById('toast');
+    t.innerHTML = `<span>${esc(msg)}</span><button class="undo">Undo</button>`; t.hidden = false;
+    t.querySelector('.undo').onclick = () => { clearTimeout(toast._t); t.hidden = true; undo(); };
+    clearTimeout(toast._t); toast._t = setTimeout(() => (t.hidden = true), 6000);
+  }
 
   function fillLists() {
     document.getElementById('dl-glass').innerHTML = settings.glass.map((d) => `<option value="${esc(d)}">`).join('');
@@ -398,7 +404,8 @@
       <div class="row">
         <div class="codecol">
           <input class="code ${isDup ? 'bad' : ''}" data-k="code" value="${esc(it.code)}" title="${isDup ? 'This code is used twice' : 'Code (you can change it)'}" aria-label="Code">
-          <button class="icon more" data-act="more" title="More: remarks, site photos, type, move, delete">${open ? '▴' : '⋯'}</button>
+          <button class="icon more" data-act="more" title="More: remarks, site photos, type, move">${open ? '▴' : '⋯'}</button>
+          <button class="icon delbtn" data-act="del" title="Delete ${esc(it.code)}" aria-label="Delete ${esc(it.code)}">🗑</button>
         </div>
         <div class="trio" data-g="w">${mInput('w', 0, 'Width left', it)}${mInput('w', 1, 'Width centre', it)}${mInput('w', 2, 'Width right', it)}</div>
         <div class="trio" data-g="h">${mInput('h', 0, 'Height top', it)}${mInput('h', 1, 'Height middle', it)}${mInput('h', 2, 'Height bottom', it)}</div>
@@ -425,7 +432,7 @@
           <select data-k="type" aria-label="Type">${C.types.map((x) => `<option value="${x.key}" ${x.key === it.type ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}</select>
           <button class="icon" data-act="up" title="Move up">↑</button>
           <button class="icon" data-act="down" title="Move down">↓</button>
-          <button class="icon danger" data-act="del" title="Delete">✕</button>
+
         </div>
       </div>
     </section>`;
@@ -1027,7 +1034,12 @@
       card.scrollIntoView({ behavior: 'smooth', block: 'start' });
       card.querySelector('[data-m="w"]').focus({ preventScroll: true });
     }
-    if (act === 'del' && it && confirm(it.lot ? `${it.code} is already in production (Lot ${it.lot}). Delete it anyway?` : `Delete ${it.code}?`)) { job.items = job.items.filter((x) => x !== it); touch(); viewWork(); }
+    if (act === 'del' && it && confirm(it.lot ? `${it.code} is already in production (Lot ${it.lot}). Delete it anyway?` : `Delete ${it.code}?`)) {
+      const at = job.items.indexOf(it);
+      job.items = job.items.filter((x) => x !== it); touch(); await saveNow(); viewWork();
+      // a few seconds to bring it back, in case the wrong one was deleted
+      toastUndo(`${it.code} deleted`, async () => { job.items.splice(Math.min(at, job.items.length), 0, it); touch(); await saveNow(); viewWork(); toast(`${it.code} restored`); });
+    }
     if ((act === 'up' || act === 'down') && it) {
       const i = job.items.indexOf(it), j = act === 'up' ? i - 1 : i + 1;
       if (j >= 0 && j < job.items.length) { [job.items[i], job.items[j]] = [job.items[j], job.items[i]]; touch(); viewWork(); }
