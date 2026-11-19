@@ -663,3 +663,49 @@ button.stat:hover { transform: translateY(-2px); border-color: var(--border-stro
 .sh-table .cutboxes { margin: 0 auto; }
 .sh-table tr.phrow td { text-align: left !important; }
 .sh-table td.fit { padding-left: 12px; padding-right: 12px; }
+
+/* production sheets: the same type as the quotation software's printed quote -
+   Segoe UI / Arial (prints and turns into PDF cleanly), company name in Cinzel to match the crown emblem */
+.sheet {
+  --font: "Segoe UI", Arial, Helvetica, sans-serif;
+  --display: "Segoe UI", Arial, Helvetica, sans-serif;
+  font-family: var(--font); color: #1A1D2B;
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+}
+.sheet .sh-table, .sheet .sh-table th, .sheet .sh-table td, .sheet .sh-info, .sheet .sh-foot, .sheet .sh-sign { font-family: var(--font); }
+.sheet .sh-co b { font-family: "Cinzel", "Times New Roman", serif !important; font-weight: 700; letter-spacing: .05em; color: var(--navy-800); }
+.sheet .sh-co span { font-family: var(--font); letter-spacing: .2em; }
+.sheet .sh-table td.num, .sheet .sh-table td.num b, .sheet .sh-design b { font-family: var(--font); }
+.sheet .sh-table td b, .sheet .sh-table td.num b { font-weight: 700; }
+
+/* ---------- sheet header, laid out like the quotation software's quote header ---------- */
+.sheet .hdr { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px 22px; padding-bottom: 16px; margin-bottom: 16px; position: relative; }
+.sheet .hdr::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; border-radius: 2px;
+  background: linear-gradient(135deg, #6E5210 0%, #B48A1D 13%, #F3E39C 29%, #D4AF37 45%, #8E6C13 61%, #EFD87E 79%, #B48A1D 100%);
+  -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.sheet .hdr img { width: 112px; height: 112px; border-radius: 16px; box-shadow: 0 6px 16px -8px rgba(10,16,48,.5); }
+.sheet .hdr .who { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.sheet .hdr .co { font-family: "Cinzel", "Times New Roman", serif; font-weight: 700; font-size: 32px; letter-spacing: .05em; color: var(--navy-800); line-height: 1.05; }
+.sheet .hdr .addr { font-size: 11.5px; line-height: 1.45; color: var(--ink-soft); padding-bottom: 6px; border-bottom: 1px solid #E6E1D6; }
+.sheet .hdr .contact { display: flex; flex-wrap: wrap; gap: 4px 24px; }
+.sheet .hdr .contact span, .sheet .hdr .meta > div { display: flex; flex-direction: column; min-width: 0; font-size: 12.5px; color: var(--navy-800); font-weight: 600; overflow-wrap: anywhere; }
+.sheet .hdr em { font-style: normal; font-size: 9.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--gold-700); margin-bottom: 1px; }
+.sheet .doctitle { align-self: start; font: 700 13px var(--font); letter-spacing: .18em; text-transform: uppercase; color: #fff; background: var(--navy-800);
+  padding: 8px 14px; border-radius: 8px; white-space: nowrap; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.sheet .doctitle.install { background: #1E7F55; }
+.sheet .hdr .meta { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(6, minmax(0, auto)); justify-content: space-between; gap: 6px 18px;
+  padding: 9px 14px; border-radius: 8px; background: #F1F3FA; border: 1px solid #DDE2F0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.sheet .hdr .meta > div { font-size: 13.5px; font-weight: 700; }
+.sheet .hdr .meta > div.wide { grid-column: 1 / -1; padding-top: 6px; border-top: 1px solid #DDE2F0; }
+@media (max-width: 760px) {
+  .sheet .hdr { grid-template-columns: auto minmax(0, 1fr); }
+  .sheet .hdr img { width: 72px; height: 72px; }
+  .sheet .hdr .co { font-size: 22px; }
+  .sheet .doctitle { grid-column: 1 / -1; justify-self: start; }
+  .sheet .hdr .meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media print {
+  .sheet .hdr img { width: 96px; height: 96px; box-shadow: none; }
+  .sheet .hdr .co { font-size: 28px; }
+  .sheet .hdr .meta > div { font-size: 10.5pt; }
+}

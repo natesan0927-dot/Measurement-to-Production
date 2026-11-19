@@ -729,14 +729,26 @@
     return `
       ${install && waiting ? `<p class="warn noprint">${waiting} site photo${waiting === 1 ? ' is' : 's are'} still waiting to upload from the measuring phone. Their links appear here once uploaded.</p>` : ''}
       <article class="sheet ${install ? 'install' : ''}">
-        <header class="sh-head">
-          <div class="sh-co"><img src="assets/titans_logo_trim.png" alt=""><div><b>${esc(C.company)}</b><span>${install ? 'INSTALLATION SHEET' : 'PRODUCTION SHEET'}</span></div></div>
-          <table class="sh-info">
-            <tr><th>Job no</th><td>${esc(job.no)}</td><th>Date</th><td>${fmtDate(job.date)}</td></tr>
-            <tr><th>Customer</th><td>${esc(job.customer)}</td><th>Phone</th><td>${esc(job.phone)}</td></tr>
-            <tr><th>Site</th><td>${esc(job.site)}</td><th>Measured by</th><td>${esc(job.measuredBy)}</td></tr>
-            <tr><th>Address</th><td colspan="3">${esc(job.address)}</td></tr>
-          </table>
+        <header class="hdr">
+          <img src="assets/titans_logo_trim.png" alt="Titans">
+          <div class="who">
+            <div class="co">${esc(C.company)}</div>
+            <div class="addr">${esc(C.address || '')}</div>
+            <div class="contact">
+              <span><em>Phone</em>${esc(C.phone || '')}${C.phone2 ? '<br>' + esc(C.phone2) : ''}</span>
+              <span><em>Email</em>${esc(C.email || '')}</span>
+            </div>
+          </div>
+          <div class="doctitle ${install ? 'install' : ''}">${install ? 'Installation sheet' : 'Production sheet'}</div>
+          <div class="meta">
+            <div><em>Job No.</em>${esc(job.no)}</div>
+            <div><em>Customer</em>${esc(job.customer) || '–'}</div>
+            <div><em>Phone</em>${esc(job.phone) || '–'}</div>
+            <div><em>Site</em>${esc(job.site) || '–'}</div>
+            <div><em>Measured by</em>${esc(job.measuredBy) || '–'}</div>
+            <div><em>Date</em>${fmtDate(job.date) || '–'}</div>
+            ${job.address ? `<div class="wide"><em>Address</em>${esc(job.address)}</div>` : ''}
+          </div>
         </header>
         <table class="sh-table">
           <thead><tr>${head}</tr></thead>
