@@ -800,3 +800,17 @@ button.stat:hover { transform: translateY(-2px); border-color: var(--border-stro
   .sheet .doctitle.sumtitle { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 @media (max-width: 640px) { .sumtotals { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* factory sheet: every column has a fixed share of the page, so the cutting boxes always stay big enough
+   to write in; long designs, glass names and remarks wrap onto more lines instead of squeezing the boxes */
+.sh-table.factory { table-layout: fixed; width: 100%; }
+.sh-table.factory td, .sh-table.factory th { white-space: normal !important; overflow-wrap: anywhere; min-width: 0 !important; width: auto; }
+.sh-table.factory td.cut { min-width: 0 !important; width: auto !important; }
+.sh-table.factory .cutboxes { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.sh-table.factory .cutboxes span { height: 52px; }
+.sh-table.factory .sh-design b { line-height: 1.25; }
+@media print {
+  .sh-table.factory .cutboxes { gap: 2.5mm; }
+  .sh-table.factory .cutboxes span { height: 13mm; }
+  .sh-table.factory td, .sh-table.factory th { padding: 2mm 1.5mm; }
+}

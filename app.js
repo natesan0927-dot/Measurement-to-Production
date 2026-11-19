@@ -780,7 +780,8 @@
             ${job.address ? `<div class="wide"><em>Address</em>${esc(job.address)}</div>` : ''}
           </div>
         </header>
-        <table class="sh-table">
+        <table class="sh-table ${install ? '' : 'factory'}">
+          ${install ? '' : `<colgroup><col style="width:5%"><col style="width:6.5%"><col style="width:6.5%"><col style="width:11%"><col style="width:9.5%"><col style="width:6%"><col style="width:6.5%"><col style="width:36%"><col style="width:13%"></colgroup>`}
           <thead><tr>${head}</tr></thead>
           <tbody>${items.map(row).join('') || `<tr><td colspan="${cols.length}" class="empty">No approved items yet.</td></tr>`}</tbody>
         </table>
