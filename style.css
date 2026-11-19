@@ -712,3 +712,23 @@ button.stat:hover { transform: translateY(-2px); border-color: var(--border-stro
 
 /* the company name in Cinzel, as in the quotation software's quote header */
 .brand b { font-family: "Cinzel", "Times New Roman", serif !important; font-weight: 700; letter-spacing: .05em; }
+
+/* ---------- production lots ---------- */
+.pill.lot { background: #EDE7FB; color: #5B3DB5; }
+.pill.wait { background: #FFF1D6; color: #8A5A00; }
+.pill.production { background: #EDE7FB; color: #5B3DB5; }
+.item.produced { border-left-color: #7C5CD6; background: linear-gradient(90deg, #F5F1FE, var(--surface) 55%); }
+.item.produced .trio input, .item.produced .design { opacity: .75; cursor: not-allowed; }
+.item.produced .specs, .item.produced .dactions select { pointer-events: none; opacity: .75; }
+.rv.produced { border-left-color: #7C5CD6 !important; background: linear-gradient(90deg, #F5F1FE, var(--surface) 45%); }
+.lotlock { font-size: 12.5px; color: #5B3DB5; background: #F5F1FE; border: 1px solid #DDD3F7; border-radius: 8px; padding: 8px 10px; }
+.summary { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.summary .lot b { color: #5B3DB5; }
+@media (max-width: 640px) { .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.seg.lots { margin-right: 8px; }
+.seg.lots button.on { background: #5B3DB5; color: #fff; }
+.sheet .hdr .meta { grid-template-columns: repeat(7, minmax(0, auto)); }
+.sheet .hdr .meta .lotcell { color: #5B3DB5; }
+.lotnotes { margin-top: 14px; padding: 10px 12px; border: 1px dashed var(--border-strong); border-radius: 8px; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+.lotnotes .done { color: #5B3DB5; }
+@media print { .lotnotes { font-size: 10pt; border-color: #888; } }

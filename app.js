@@ -20,6 +20,11 @@
   // one step at a time on every screen (measurement -> approval -> production sheet)
   const wide = () => false;
   const allApproved = (j) => j.items.length > 0 && j.items.every((i) => i.approved);
+  // production in lots: approved windows not yet in a lot go into the next lot; a window is never in two lots
+  const lotsOf = (j) => j.lots || [];
+  const hasLots = (j) => lotsOf(j).length > 0;
+  const readyForLot = (j) => j.items.filter((i) => i.approved && !i.lot);
+  let viewLot = null;          // the lot shown on the production sheet
   const canReview = (j) => !!j.sentToReview && j.items.length > 0;
 
   // ---------- small helpers ----------
@@ -68,11 +73,12 @@
   function jobStatus(j) {
     const items = j.items || [];
     if (!items.length) return 'measuring';
-    if (items.every((i) => i.approved)) return 'approved';
+    if (items.every((i) => i.lot)) return 'approved';
+    if (items.some((i) => i.lot)) return 'production';
     if (j.sentToReview || items.some((i) => i.approved)) return 'review';
     return 'measuring';
   }
-  const STATUS = { measuring: 'Measuring', review: 'Waiting approval', approved: 'Approved for production' };
+  const STATUS = { measuring: 'Measuring', review: 'Waiting approval', production: 'Part in production', approved: 'All in production' };
 
   function nextCode(j, typeKey) {
     const p = typeOf(typeKey).prefix;
@@ -96,7 +102,7 @@
   const defaultGlass = (typeKey) => settings.defaults.glass[typeKey] || settings.defaults.glass.W || '';
   // measurements changed after approval -> approval no longer valid
   function dropStaleApproval(item) {
-    if (item.approved && item.approvedSig !== RULES.signature(item)) {
+    if (item.approved && !item.lot && item.approvedSig !== RULES.signature(item)) {
       item.approved = false; item.approvedAt = null; item.approvedSig = null; item.final = null;
       return true;
     }
@@ -143,11 +149,10 @@
     if (inJob) {
       const n = job.items.length, ok = job.items.filter((i) => i.approved).length;
       const over = job.items.filter((i) => RULES.check(i, settings.toleranceMm).flagged && !i.approved).length;
-      const ready = job.items.filter((i) => i.approved).length;
       const st = [
         ['job', 'job', '1 · Measurement', `${n} item${n === 1 ? '' : 's'}${job.sentToReview ? ' · complete' : ''}`, job.sentToReview ? 'done' : '', true],
         ['review', 'review', '2 · Approval', canReview(job) ? `${ok} of ${n} approved${over ? ` · ${over} over ${settings.toleranceMm} mm` : ''}` : 'after measurement', over ? 'warn' : allApproved(job) ? 'done' : '', canReview(job)],
-        ['sheet', 'sheet', '3 · Production sheet', allApproved(job) ? `${ready} item${ready === 1 ? '' : 's'} ready` : 'after approval', '', allApproved(job)],
+        ['sheet', 'sheet', '3 · Production', hasLots(job) ? `${lotsOf(job).length} lot${lotsOf(job).length === 1 ? '' : 's'} · ${job.items.filter((i) => i.lot).length} of ${n} windows` : 'after approval', job.items.every((i) => i.lot) ? 'done' : '', hasLots(job)],
       ];
       stages = `<div class="navsec">
         <p class="navlabel">Current job</p>
@@ -180,7 +185,7 @@
     if (work && job && job.id === id) {
       // a step can only be opened once the one before it is done
       if (view === 'review' && !canReview(job)) { toast('Mark the measurements complete first'); location.replace(`#/job/${id}`); return; }
-      if (view === 'sheet' && !allApproved(job)) { toast('Approve every window first'); location.replace(`#/${canReview(job) ? 'review' : 'job'}/${id}`); return; }
+      if (view === 'sheet' && !hasLots(job)) { toast('Generate a production lot first'); location.replace(`#/${canReview(job) ? 'review' : 'job'}/${id}`); return; }
     }
     if (work) {
       pane = view;
@@ -200,7 +205,8 @@
     job.items = job.items || [];
     job.items.forEach(dropStaleApproval);
     if (view === 'review' && !canReview(job)) { location.replace(`#/job/${id}`); return; }
-    if (view === 'sheet' && !allApproved(job)) { location.replace(`#/${canReview(job) ? 'review' : 'job'}/${id}`); return; }
+    if (view === 'sheet' && !hasLots(job)) { location.replace(`#/${canReview(job) ? 'review' : 'job'}/${id}`); return; }
+    if (!viewLot || !lotsOf(job).some((l) => l.no === viewLot)) viewLot = hasLots(job) ? lotsOf(job)[lotsOf(job).length - 1].no : null;
     if (work) return viewWork();
     location.hash = '#/';
   }
@@ -219,7 +225,7 @@
       ['all', 'All jobs', jobs.length, ''],
       ['measuring', 'Measuring', count('measuring'), 'blue'],
       ['review', 'Waiting approval', count('review'), 'amber'],
-      ['approved', 'Ready for production', count('approved'), 'green'],
+      ['approved', 'In production', count('approved') + count('production'), 'green'],
     ];
     $app.innerHTML = `
       <section class="hero">
@@ -252,7 +258,8 @@
   function applyHomeFilter() {
     const q = (document.querySelector('[data-search]') || {}).value || '';
     document.querySelectorAll('.jobcard').forEach((c) => {
-      c.hidden = (homeFilter !== 'all' && c.dataset.status !== homeFilter) || (q && !c.dataset.text.includes(q.trim().toLowerCase()));
+      const st = c.dataset.status === 'production' ? 'approved' : c.dataset.status;
+      c.hidden = (homeFilter !== 'all' && st !== homeFilter) || (q && !c.dataset.text.includes(q.trim().toLowerCase()));
     });
   }
   function jobCard(j) {
@@ -328,7 +335,7 @@
     $app.querySelector('[data-psub]').textContent = `${job.no} · ${job.customer || 'No customer name'}` +
       (show === 'sheet' ? (sheetKind === 'install' ? ' · for the installation team' : ' · for the factory') : ' · check the sizes, then approve');
     $app.querySelector('[data-paction]').innerHTML = show === 'sheet'
-      ? `<div class="seg"><button data-act="kind" data-k="factory" class="${sheetKind === 'factory' ? 'on' : ''}">Factory sheet</button><button data-act="kind" data-k="install" class="${sheetKind === 'install' ? 'on' : ''}">Installation sheet</button></div>`
+      ? `${lotsOf(job).length > 1 ? `<div class="seg lots">${lotsOf(job).map((l) => `<button data-act="lot" data-no="${l.no}" class="${l.no === viewLot ? 'on' : ''}">Lot ${l.no}</button>`).join('')}</div>` : ''}<div class="seg"><button data-act="kind" data-k="factory" class="${sheetKind === 'factory' ? 'on' : ''}">Factory sheet</button><button data-act="kind" data-k="install" class="${sheetKind === 'install' ? 'on' : ''}">Installation sheet</button></div>`
       : `<button class="btn small" data-act="approve-ok">Approve all within ${settings.toleranceMm} mm</button>`;
     const approved = job.items.filter((i) => i.approved).length;
     const n = job.items.length;
@@ -336,9 +343,11 @@
       job: `<button class="btn" data-act="save">Save</button>
             <button class="btn gold" data-act="to-review" ${n ? '' : 'disabled'}>✓ Mark complete &amp; proceed →</button>`,
       review: `<a class="btn ghost" href="#/job/${job.id}">← Measurements</a>
-            <span class="footnote">${approved} of ${n} approved</span>
-            <button class="btn gold" data-act="to-sheet" ${allApproved(job) ? '' : 'disabled'} title="${allApproved(job) ? '' : 'Approve every window first'}">Generate production sheet →</button>`,
+            <span class="footnote">${approved} of ${n} approved · ${job.items.filter((i) => i.lot).length} in production</span>
+            ${hasLots(job) ? `<button class="btn ghost" data-act="view-lots">Production lots (${lotsOf(job).length})</button>` : ''}
+            <button class="btn gold" data-act="to-sheet" ${readyForLot(job).length ? '' : 'disabled'} title="${readyForLot(job).length ? '' : 'Approve windows first'}">Generate production lot${readyForLot(job).length ? ` (${readyForLot(job).length})` : ''} →</button>`,
       sheet: `<a class="btn ghost" href="#/review/${job.id}">← Approval</a>
+            ${readyForLot(job).length ? `<span class="footnote">${readyForLot(job).length} approved window${readyForLot(job).length === 1 ? '' : 's'} not in a lot yet</span>` : ''}
             <button class="btn gold" data-act="print">Print / Save PDF</button>`,
     };
     // wide screen: measurements are always on the left, so the buttons follow the right-hand tab
@@ -366,7 +375,7 @@
   function refreshCardPills() {
     $app.querySelectorAll('.item').forEach((card) => {
       const it = job.items.find((i) => i.id === card.dataset.id);
-      if (it) card.querySelector('[data-pill]').innerHTML = it.approved ? `<span class="pill approved">Approved</span>` : '';
+      if (it) card.querySelector('[data-pill]').innerHTML = itemPill(it);
     });
   }
   function isSiteOpen() { return siteOpen == null ? !job.customer : siteOpen; }
@@ -383,7 +392,7 @@
     const isDup = dup && dup.has(String(it.code).trim().toUpperCase());
     const open = openRows.has(it.id);
     const sub = rowSubText(it);
-    return `<section class="item ${it.type === 'V' ? 'vent' : ''} ${open ? 'open' : ''}" data-id="${it.id}">
+    return `<section class="item ${it.type === 'V' ? 'vent' : ''} ${open ? 'open' : ''} ${it.lot ? 'produced' : ''}" data-id="${it.id}">
       <div class="row">
         <div class="codecol">
           <input class="code ${isDup ? 'bad' : ''}" data-k="code" value="${esc(it.code)}" title="${isDup ? 'This code is used twice' : 'Code (you can change it)'}" aria-label="Code">
@@ -391,7 +400,7 @@
         </div>
         <div class="trio" data-g="w">${mInput('w', 0, 'Width left', it)}${mInput('w', 1, 'Width centre', it)}${mInput('w', 2, 'Width right', it)}</div>
         <div class="trio" data-g="h">${mInput('h', 0, 'Height top', it)}${mInput('h', 1, 'Height middle', it)}${mInput('h', 2, 'Height bottom', it)}</div>
-        <button class="design ${it.design ? '' : 'empty'}" data-act="keypad" title="Design">${designFace(it)}</button>
+        <button class="design ${it.design ? '' : 'empty'}" data-act="keypad" title="Design" ${it.lot ? 'disabled' : ''}>${designFace(it)}</button>
       </div>
       <div class="specs">
         <label class="sf"><span>Location</span>${pick('location', it.location, settings.locations)}</label>
@@ -399,7 +408,7 @@
         <label class="sf"><span>Glass</span>${pick('glass', it.glass, settings.glass)}</label>
         <label class="sf"><span>Section</span>${pick('section', it.section, settings.sections)}</label>
       </div>
-      <div class="rowsub"><span data-status>${rowStatus(it)}</span><span class="muted" data-sub>${esc(sub)}</span><span data-pill>${it.approved ? `<span class="pill approved">Approved</span>` : ''}</span></div>
+      <div class="rowsub"><span data-status>${rowStatus(it)}</span><span class="muted" data-sub>${esc(sub)}</span><span data-pill>${itemPill(it)}</span></div>
       <div class="details" ${open ? '' : 'hidden'}>
         <div class="grid">
           <label class="f wide"><span>Remarks</span><textarea data-k="remarks" rows="2" placeholder="Opening side, site conditions…">${esc(it.remarks)}</textarea></label>
@@ -427,7 +436,7 @@
   }
   function mInput(dim, i, label, it) {
     const tag = 'LCRTMB'[dim === 'w' ? i : i + 3];
-    return `<label class="mv"><i>${tag}</i><input inputmode="numeric" pattern="[0-9]*" data-m="${dim}" data-i="${i}" value="${esc(it[dim][i])}" aria-label="${label}" title="${label}"></label>`;
+    return `<label class="mv"><i>${tag}</i><input inputmode="numeric" pattern="[0-9]*" data-m="${dim}" data-i="${i}" value="${esc(it[dim][i])}" aria-label="${label}" title="${it.lot ? `In production (Lot ${it.lot}): locked` : label}" ${it.lot ? 'disabled' : ''}></label>`;
   }
   // short status under the line: least size, and the difference in red if over the limit
   function rowStatus(it) {
@@ -449,6 +458,9 @@
       box.querySelectorAll('input').forEach((inp) => inp.classList.toggle('least', st.count > 1 && inp.value !== '' && Number(inp.value) === st.min));
     });
     card.querySelector('[data-status]').innerHTML = rowStatus(it);
+  }
+  function itemPill(it) {
+    return it.lot ? `<span class="pill lot">🔒 In production · Lot ${it.lot}</span>` : it.approved ? `<span class="pill approved">Approved</span>` : '';
   }
   function rowSubText(it) {
     const n = (it.photos || []).length;
@@ -614,7 +626,8 @@
         <div><b>${rows.length}</b><span>items</span></div>
         <div class="${approved === rows.length ? 'ok' : ''}"><b>${approved}</b><span>approved</span></div>
         <div class="${flagged ? 'over' : ''}"><b>${flagged}</b><span>over ${tol} mm</span></div>
-        <div class="${incomplete ? 'over' : ''}"><b>${incomplete}</b><span>incomplete</span></div>
+        <div class="${incomplete ? 'over' : ''}"><b>${incomplete}</b><span>waiting for measurement</span></div>
+        <div class="lot"><b>${rows.filter((x) => x.it.lot).length}</b><span>in production</span></div>
       </div>
       <div class="review">
         ${rows.map(({ it, r }) => reviewCard(it, r)).join('')}
@@ -628,12 +641,12 @@
       const cls = v === '' ? 'miss' : n === st.min ? 'least' : n === st.max && st.diff ? 'most' : '';
       return `<td class="${cls}">${v === '' ? '–' : esc(v)}</td>`;
     };
-    const cls = it.approved ? 'approved' : r.flagged || !r.complete ? 'flagged' : '';
+    const cls = it.lot ? 'approved produced' : it.approved ? 'approved' : r.flagged || !r.complete ? 'flagged' : '';
     return `<section class="card rv ${cls}" data-id="${it.id}">
       <div class="rv-head">
         <b class="rv-code">${esc(it.code)}</b><span class="muted">${esc(typeOf(it.type).label)}${it.location ? ' · ' + esc(it.location) : ''}</span>
         <span class="grow"></span>
-        ${it.approved ? `<span class="pill approved">✓ Approved</span>` : r.flagged ? `<span class="pill over">⚠ Over ${settings.toleranceMm} mm</span>` : !r.complete ? `<span class="pill over">Incomplete</span>` : `<span class="pill">Ready</span>`}
+        ${it.lot ? `<span class="pill lot">🔒 In production · Lot ${it.lot}</span>` : it.approved ? `<span class="pill approved">✓ Approved</span>` : !r.complete ? `<span class="pill wait">Waiting for measurement</span>` : r.flagged ? `<span class="pill over">⚠ Over ${settings.toleranceMm} mm</span>` : !r.complete ? `<span class="pill over">Incomplete</span>` : `<span class="pill">Ready</span>`}
       </div>
       <div class="rv-body">
         <table class="mt vert">
@@ -650,7 +663,9 @@
             <input inputmode="numeric" data-final="h" value="${esc(fh == null ? '' : fh)}" ${it.approved ? 'disabled' : ''}>
           </div>
           ${it.final && !it.approved && (Number(it.final.w) !== r.w.min || Number(it.final.h) !== r.h.min) ? `<small class="muted">Edited (least was ${mm(r.w.min)} × ${mm(r.h.min)})</small>` : ''}
-          ${it.approved
+          ${it.lot
+            ? `<div class="lotlock">Sent to production in <b>Lot ${it.lot}</b> on ${fmtDate(it.lotAt)}. Locked, so it is not made twice.</div>`
+            : it.approved
             ? `<button class="btn small ghost" data-act="unapprove">Undo approval</button>`
             : `<button class="btn small gold" data-act="approve" ${r.complete ? '' : 'disabled'}>Approve</button>`}
         </div>
@@ -708,7 +723,8 @@
   }
   function sheetHtml() {
     const install = sheetKind === 'install';
-    const items = job.items.filter((i) => i.approved);
+    const lot = lotsOf(job).find((l) => l.no === viewLot) || lotsOf(job)[lotsOf(job).length - 1];
+    const items = lot ? job.items.filter((i) => i.lot === lot.no) : [];
     const count = (k) => items.filter((i) => i.type === k).length;
     const total = items.length;
     const waiting = items.reduce((a, i) => a + (i.photos || []).filter((p) => p.status !== 'done').length, 0);
@@ -747,6 +763,7 @@
             <div><em>Site</em>${esc(job.site) || '–'}</div>
             <div><em>Measured by</em>${esc(job.measuredBy) || '–'}</div>
             <div><em>Date</em>${fmtDate(job.date) || '–'}</div>
+            ${lot ? `<div class="lotcell"><em>Production lot</em>Lot ${lot.no} of ${lotsOf(job).length} · ${fmtDate(lot.at)}</div>` : ''}
             ${job.address ? `<div class="wide"><em>Address</em>${esc(job.address)}</div>` : ''}
           </div>
         </header>
@@ -756,10 +773,23 @@
         </table>
         <footer class="sh-foot">
           <span>Total: <b>${total}</b> (${C.types.map((t) => `${esc(t.label)}s ${count(t.key)}`).join(', ')}) · All sizes in mm</span>
-          <span>Approved ${items.length ? fmtDate(items.map((i) => i.approvedAt).sort().pop()) : ''}</span>
+          <span>Lot ${lot ? lot.no : ''} · ${lot ? fmtDate(lot.at) : ''}</span>
         </footer>
+        ${lotNotes(lot)}
         <div class="sh-sign">${install ? '<div>Installed by</div><div>Customer signature</div><div>Date of installation</div>' : '<div>Measured by</div><div>Approved by</div><div>Production in-charge</div>'}</div>
       </article>`;
+  }
+  // under the sheet: what is already in production (so nothing is made twice) and what is still to come
+  function lotNotes(lot) {
+    if (!lot) return '';
+    const earlier = lotsOf(job).filter((l) => l.no !== lot.no);
+    const pending = job.items.filter((i) => !i.lot);
+    const codes = (ids) => job.items.filter((i) => ids.includes(i.id)).map((i) => esc(i.code)).join(', ');
+    if (!earlier.length && !pending.length) return '';
+    return `<div class="lotnotes">
+      ${earlier.map((l) => `<div class="done"><b>Lot ${l.no} · ${fmtDate(l.at)} (not on this sheet):</b> ${codes(l.items)}</div>`).join('')}
+      ${pending.length ? `<div><b>Not in production yet:</b> ${pending.map((i) => esc(i.code)).join(', ')}</div>` : ''}
+    </div>`;
   }
   // under each window on the installation sheet: the link (and QR code) to its site photos
   function photoLine(it) {
@@ -776,7 +806,7 @@
   function steps(cur) {
     if (!job) return '';
     const s = [['job', 'Measurement'], ['review', 'Approval'], ['sheet', 'Production sheet']];
-    const open = { job: true, review: canReview(job), sheet: allApproved(job) };
+    const open = { job: true, review: canReview(job), sheet: hasLots(job) };
     return `<nav class="steps">${s.map(([k, l], i) => {
       const href = open[k] ? `#/${k}/${job.id}` : null;
       return href ? `<a href="${href}" class="${k === cur ? 'on' : ''}"><i>${i + 1}</i>${l}</a>` : `<span><i>${i + 1}</i>${l}</span>`;
@@ -939,7 +969,7 @@
       card.scrollIntoView({ behavior: 'smooth', block: 'start' });
       card.querySelector('[data-m="w"]').focus({ preventScroll: true });
     }
-    if (act === 'del' && it && confirm(`Delete ${it.code}?`)) { job.items = job.items.filter((x) => x !== it); touch(); viewWork(); }
+    if (act === 'del' && it && confirm(it.lot ? `${it.code} is already in production (Lot ${it.lot}). Delete it anyway?` : `Delete ${it.code}?`)) { job.items = job.items.filter((x) => x !== it); touch(); viewWork(); }
     if ((act === 'up' || act === 'down') && it) {
       const i = job.items.indexOf(it), j = act === 'up' ? i - 1 : i + 1;
       if (j >= 0 && j < job.items.length) { [job.items[i], job.items[j]] = [job.items[j], job.items[i]]; touch(); viewWork(); }
@@ -970,17 +1000,14 @@
       const dup = dupCodes(job);
       if (dup.size) return alert('These codes are used more than once: ' + [...dup].join(', ') + '\nChange them first.');
       const missing = job.items.filter((x) => !RULES.check(x, settings.toleranceMm).complete).map((x) => x.code);
-      if (missing.length) {
-        $app.querySelectorAll('.item').forEach((c) => c.classList.toggle('missing', missing.includes(job.items.find((i) => i.id === c.dataset.id).code)));
-        $app.querySelector('.item.missing')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        return alert(`Fill all 3 widths and 3 heights first for: ${missing.join(', ')}`);
-      }
+      if (missing.length === job.items.length) return alert('Measure at least one window fully (3 widths and 3 heights) first.');
+      if (missing.length && !confirm(`${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} not fully measured yet.\n\nThe measured windows go ahead for approval; ${missing.length === 1 ? 'this one waits' : 'these wait'} until measured. Continue?`)) return;
       job.sentToReview = true; touch(); await saveNow();
       tab = 'review'; toast('Measurements complete · saved');
       location.hash = `#/review/${job.id}`;
     }
     if (act === 'approve' && it) { if (approveItem(it)) { touch(); renderPreview(); refreshCardPills(); showFootOnly(); popApproved([it]); } }
-    if (act === 'unapprove' && it) { it.approved = false; it.approvedAt = null; it.approvedSig = null; touch(); renderPreview(); refreshCardPills(); showFootOnly(); }
+    if (act === 'unapprove' && it && !it.lot) { it.approved = false; it.approvedAt = null; it.approvedSig = null; touch(); renderPreview(); refreshCardPills(); showFootOnly(); }
     if (act === 'tab') {
       tab = b.dataset.tab;
       if (wide()) showPane();
@@ -993,7 +1020,25 @@
       touch(); renderPreview(); refreshCardPills(); showFootOnly(); popApproved(done);
       if (!job.items.every((x) => x.approved)) toast(n ? `${n} approved` : 'Nothing to approve');
     }
-    if (act === 'to-sheet') { if (!allApproved(job)) return toast('Approve every window first'); await saveNow(); tab = 'sheet'; if (wide()) showPane(); else location.hash = `#/sheet/${job.id}`; }
+    if (act === 'to-sheet') {
+      const ready = readyForLot(job);
+      if (!ready.length) return toast('Approve windows first');
+      const no = lotsOf(job).length + 1;
+      const waiting = job.items.length - job.items.filter((i) => i.lot).length - ready.length;
+      if (!confirm(`Create production Lot ${no} with ${ready.length} window${ready.length === 1 ? '' : 's'}:\n${ready.map((i) => i.code).join(', ')}` +
+        (waiting ? `\n\n${waiting} other window${waiting === 1 ? ' stays' : 's stay'} pending for a later lot.` : '') +
+        `\n\nWindows in a lot are locked and never repeated in another lot.`)) return;
+      const at = new Date().toISOString();
+      ready.forEach((i) => { i.lot = no; i.lotAt = at; });
+      (job.lots = job.lots || []).push({ no, at, items: ready.map((i) => i.id) });
+      viewLot = no; sheetKind = 'factory';
+      touch(); await saveNow(); tab = 'sheet';
+      toast(`Lot ${no} created`);
+      location.hash = `#/sheet/${job.id}`;
+      viewWork();   // redraw everything, so the windows now in production show as locked
+    }
+    if (act === 'view-lots') { await saveNow(); tab = 'sheet'; location.hash = `#/sheet/${job.id}`; }
+    if (act === 'lot') { viewLot = Number(b.dataset.no); showPane(); }
     if (act === 'print') { tab = 'sheet'; renderPreview(); }
     if (act === 'print') window.print();
     if (act === 'save-settings') saveSettings();
