@@ -763,3 +763,9 @@ button.stat:hover { transform: translateY(-2px); border-color: var(--border-stro
   .sh-table tbody tr.phrow td { background: none !important; border-bottom: 0.4mm solid #444 !important; }
   .sh-table tbody tr.phrow:last-child td { border-bottom: 0.6mm solid #000 !important; }
 }
+
+/* floor, location, colour, glass, section under each window */
+.specs { grid-template-columns: minmax(0, .9fr) minmax(0, 1fr) minmax(0, .9fr) minmax(0, 1.2fr) minmax(0, .9fr); }
+@media (max-width: 560px) { .specs { grid-template-columns: repeat(2, minmax(0, 1fr)); } .specs .sf:last-child { grid-column: 1 / -1; } }
+.rv-info { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 1200px) { .rv-info { grid-template-columns: repeat(3, minmax(0, 1fr)); } .rv-info > div:nth-child(7) { grid-column: auto; } .rv-info > div:nth-child(8) { grid-column: span 2; border-right: 0; } }

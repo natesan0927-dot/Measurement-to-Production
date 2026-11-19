@@ -3,7 +3,7 @@
  * (The tolerance and the suggestion lists can also be changed in the app, under Settings.)
  */
 window.CONFIG = {
-  version: '1.29 · 19-11-2026',   // shown in the sidebar and Settings, to see which version is open
+  version: '1.30 · 19-11-2026',   // shown in the sidebar and Settings, to see which version is open
   company: 'TITANS WINDOWS',
   // shown in the production sheet header, as in the quotation software
   address: '100/2 MANGADU MAINROAD, MALAYAMBAKKAM, POONAMALLEE, CHENNAI 600056',
@@ -41,6 +41,7 @@ window.CONFIG = {
     section: { W: 'Inventa', V: 'Optima' },         // profile section: windows / ventilators
   },
   sections: ['Inventa', 'Optima'],
+  floors: ['Basement', 'Ground floor', '1st floor', '2nd floor', '3rd floor', '4th floor', '5th floor', 'Terrace'],
   locations: [
     'Hall', 'Living', 'Dining', 'Kitchen', 'Master bedroom', 'Bedroom 2', 'Bedroom 3', 'Kids bedroom',
     'Bathroom', 'Toilet', 'Pooja', 'Study', 'Balcony', 'Staircase', 'Utility', 'Store', 'Guest bedroom',

@@ -8,7 +8,7 @@
 (function () {
   const C = window.CONFIG;
   const $app = document.getElementById('app');
-  let settings = { toleranceMm: C.toleranceMm, keys: C.designKeys.map((x) => x.slice()), glass: C.glass.slice(), colours: C.colours.slice(), locations: C.locations.slice(), sections: C.sections.slice(),
+  let settings = { toleranceMm: C.toleranceMm, keys: C.designKeys.map((x) => x.slice()), glass: C.glass.slice(), colours: C.colours.slice(), locations: C.locations.slice(), floors: C.floors.slice(), sections: C.sections.slice(),
     defaults: { colour: C.defaults.colour, glass: Object.assign({}, C.defaults.glass), section: Object.assign({}, C.defaults.section) } };
   let job = null;        // the job open right now
   let saveTimer = null;
@@ -93,11 +93,13 @@
     return {
       id: uid(), type: typeKey, code: nextCode(j, typeKey),
       w: ['', '', ''], h: ['', '', ''],
-      location: '', colour: settings.defaults.colour, design: '', glass: defaultGlass(typeKey), section: defaultSection(typeKey), remarks: '',
+      floor: lastFloor(j), location: '', colour: settings.defaults.colour, design: '', glass: defaultGlass(typeKey), section: defaultSection(typeKey), remarks: '',
       final: null, approved: false, approvedAt: null, approvedSig: null,
     };
   }
   // a new item starts as White, with 5 mm Clear glass for a window and 5 mm Pinned for a ventilator
+  // a new window starts on the same floor as the one before it (a site is usually measured floor by floor)
+  const lastFloor = (j) => { const prev = (j.items || [])[(j.items || []).length - 1]; return prev ? prev.floor || '' : ''; };
   const defaultSection = (typeKey) => (settings.defaults.section || {})[typeKey] || (settings.defaults.section || {}).W || '';
   const defaultGlass = (typeKey) => settings.defaults.glass[typeKey] || settings.defaults.glass.W || '';
   // measurements changed after approval -> approval no longer valid
@@ -403,6 +405,7 @@
         <button class="design ${it.design ? '' : 'empty'}" data-act="keypad" title="Design" ${it.lot ? 'disabled' : ''}>${designFace(it)}</button>
       </div>
       <div class="specs">
+        <label class="sf"><span>Floor</span>${pick('floor', it.floor, settings.floors)}</label>
         <label class="sf"><span>Location</span>${pick('location', it.location, settings.locations)}</label>
         <label class="sf"><span>Colour</span>${pick('colour', it.colour, settings.colours)}</label>
         <label class="sf"><span>Glass</span>${pick('glass', it.glass, settings.glass)}</label>
@@ -428,7 +431,7 @@
     </section>`;
   }
   // item field -> [its list in settings, label]
-  const LISTS = { location: ['locations', 'Location'], colour: ['colours', 'Colour'], glass: ['glass', 'Glass'], section: ['sections', 'Section'] };
+  const LISTS = { floor: ['floors', 'Floor'], location: ['locations', 'Location'], colour: ['colours', 'Colour'], glass: ['glass', 'Glass'], section: ['sections', 'Section'] };
   // a drop-down of the usual choices; "Other…" lets anything else be typed (and keeps it in the list)
   function pick(key, val, list) {
     const all = val && !list.includes(val) ? [val, ...list] : list;
@@ -644,7 +647,7 @@
     const cls = it.lot ? 'approved produced' : it.approved ? 'approved' : r.flagged || !r.complete ? 'flagged' : '';
     return `<section class="card rv ${cls}" data-id="${it.id}">
       <div class="rv-head">
-        <b class="rv-code">${esc(it.code)}</b><span class="muted">${esc(typeOf(it.type).label)}${it.location ? ' · ' + esc(it.location) : ''}</span>
+        <b class="rv-code">${esc(it.code)}</b><span class="muted">${esc(typeOf(it.type).label)}${it.floor ? ' · ' + esc(it.floor) : ''}${it.location ? ' · ' + esc(it.location) : ''}</span>
         <span class="grow"></span>
         ${it.lot ? `<span class="pill lot">🔒 In production · Lot ${it.lot}</span>` : it.approved ? `<span class="pill approved">✓ Approved</span>` : !r.complete ? `<span class="pill wait">Waiting for measurement</span>` : r.flagged ? `<span class="pill over">⚠ Over ${settings.toleranceMm} mm</span>` : !r.complete ? `<span class="pill over">Incomplete</span>` : `<span class="pill">Ready</span>`}
       </div>
@@ -696,7 +699,7 @@
   function rvDetails(it) {
     const n = (it.photos || []).length;
     const rows = [
-      ['Type', typeOf(it.type).label], ['Location', it.location], ['Design', it.design], ['Glass', it.glass],
+      ['Type', typeOf(it.type).label], ['Floor', it.floor], ['Location', it.location], ['Design', it.design], ['Glass', it.glass],
       ['Colour', it.colour], ['Section', it.section], ['Site photos', n ? `📷 ${n}` : ''],
     ];
     return `<dl class="rv-info">
@@ -730,14 +733,14 @@
     const waiting = items.reduce((a, i) => a + (i.photos || []).filter((p) => p.status !== 'done').length, 0);
     // column order: Code, W, H, Design, Glass, Colour, Section, (cutting sizes), Remarks taking the rest
     const cols = install
-      ? [['Code', 'fit'], ['Location', 'fit'], ['W', 'num fit'], ['H', 'num fit'], ['Design', 'fit'], ['Glass', 'fit'], ['Colour', 'fit'], ['Section', 'fit'], ['Remarks', 'rest']]
+      ? [['Code', 'fit'], ['Floor', 'fit'], ['Location', 'fit'], ['W', 'num fit'], ['H', 'num fit'], ['Design', 'fit'], ['Glass', 'fit'], ['Colour', 'fit'], ['Section', 'fit'], ['Remarks', 'rest']]
       : [['Code', 'fit'], ['W', 'num fit'], ['H', 'num fit'], ['Design', 'fit'], ['Glass', 'fit'], ['Colour', 'fit'], ['Section', 'fit'], ['Cutting sizes <small>(filled by production)</small>', 'cutth'], ['Remarks', 'rest']];
     const head = cols.map(([t, c]) => `<th class="${c}">${t}</th>`).join('');
     const common = (it) => `
           <td class="num fit"><b>${esc(it.final.w)}</b></td><td class="num fit"><b>${esc(it.final.h)}</b></td>
           <td class="sh-design fit"><b>${esc(it.design)}</b></td><td class="fit">${esc(it.glass)}</td><td class="fit">${esc(it.colour)}</td><td class="fit">${esc(it.section)}</td>`;
     const row = (it) => install
-      ? `<tr class="${(it.photos || []).length ? 'has-sub' : ''}"><td class="fit"><b>${esc(it.code)}</b></td><td class="fit">${esc(it.location)}</td>${common(it)}<td class="rest">${esc(it.remarks)}</td></tr>
+      ? `<tr class="${(it.photos || []).length ? 'has-sub' : ''}"><td class="fit"><b>${esc(it.code)}</b></td><td class="fit">${esc(it.floor || '')}</td><td class="fit">${esc(it.location)}</td>${common(it)}<td class="rest">${esc(it.remarks)}</td></tr>
         ${(it.photos || []).length ? `<tr class="phrow"><td colspan="${cols.length}">${photoLine(it)}</td></tr>` : ''}`
       : `<tr><td class="fit"><b>${esc(it.code)}</b></td>${common(it)}
           <td class="cut"><div class="cutboxes"><span></span><span></span><span></span><span></span></div></td>
@@ -794,7 +797,7 @@
         const size = it.final ? `${it.final.w} × ${it.final.h}` : r.complete ? `${r.w.min} × ${r.h.min}` : '–';
         return `<label class="lp-item ${w ? 'off' : ''} ${it.lot ? 'done' : ''}">
           <input type="checkbox" data-lp-id="${it.id}" ${w ? 'disabled' : ''}>
-          <b>${esc(it.code)}</b><span>${esc(size)}</span><span class="muted">${esc(it.location || '')}${it.design ? ' · ' + esc(it.design) : ''}</span>
+          <b>${esc(it.code)}</b><span>${esc(size)}</span><span class="muted">${[it.floor, it.location, it.design].filter(Boolean).map(esc).join(' · ')}</span>
           ${w ? `<em>${esc(w)}</em>` : ''}</label>`;
       }).join('')}</div>
       <div class="kp-act"><button class="btn ghost" data-lp="cancel">Cancel</button><span></span><button class="btn gold" data-lp="make" disabled>Create Lot ${no}</button></div>
@@ -885,6 +888,7 @@
           <div class="keylist" data-keylist>${settings.keys.map(([k, t]) => keyRow(k, t)).join('')}</div>
           <div><button class="btn small" data-act="key-add">+ Add code</button></div>
         </div>
+        ${chipList('floors', 'Floor choices')}
         ${chipList('locations', 'Location choices')}
         ${chipList('colours', 'Colour choices')}
         ${chipList('glass', 'Glass choices')}
@@ -1115,7 +1119,7 @@
     if (twice.length) return alert('These codes are there twice: ' + twice.join(', '));
     const defaults = { colour: get('dcolour'), glass: { W: get('dglassW'), V: get('dglassV') }, section: { W: get('dsecW'), V: get('dsecV') } };
     const list = (k) => [...new Set([...document.querySelectorAll(`[data-list="${k}"] .chip input`)].map((i) => i.value.trim()).filter(Boolean))];
-    settings = { defaults, toleranceMm: tol, keys, glass: list('glass'), colours: list('colours'), locations: list('locations'), sections: list('sections') };
+    settings = { defaults, toleranceMm: tol, keys, glass: list('glass'), colours: list('colours'), locations: list('locations'), floors: list('floors'), sections: list('sections') };
     await DB.set('settings', settings); fillLists(); toast('Settings saved');
   }
   async function exportBackup() {

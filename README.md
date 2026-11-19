@@ -16,7 +16,8 @@ On a phone, open it and choose *Add to Home screen* to install it as an app.
      They can also be managed under Settings.
    - **Design codes** are the same as the quotation software: SL, OP, M (mesh), FXD, DOOR, FXLUV, LUVF, TH…
      ("SL SL M" = SLSLM). The design is shown as its codes only; no window drawings anywhere.
-   - **Location, colour, glass and section** are always shown under the measurements.
+   - **Floor, location, colour, glass and section** are always shown under the measurements (a new window starts
+     on the same floor as the one before).
      Section: **Inventa** for a window, **Optima** for a ventilator as standard. A new item starts as **White**,
      with **5 mm Clear** glass for a window and **5 mm Pinned** for a ventilator; pick another from the list (locations: Hall, Kitchen, Master bedroom, …),
      or **Other…** to type a new one (it is then kept in the list). The starting colour and glass, and the location / colour / glass lists, can be changed under Settings.
@@ -56,7 +57,7 @@ when the one before is done (the sidebar shows them, locked until then).
 **Two production sheets** (switch at the top of step 3):
 - **Factory sheet**, in this order: Code | W | H | Design | Glass | Colour | Section | 4 large cutting-size
   boxes (written in by hand) | Remarks (taking the rest of the width).
-- **Installation sheet**: the same plus location, and under each window a **link and QR code to its site photos**.
+- **Installation sheet**: the same plus floor and location, and under each window a **link and QR code to its site photos**.
   Installers open it on any phone with no login (`photos.html`).
 
 **One-time Supabase setup for site photos:** open the quotation software's Supabase project → SQL Editor →
