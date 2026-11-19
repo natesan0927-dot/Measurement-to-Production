@@ -66,7 +66,7 @@
     clearTimeout(saveTimer);
     if (!job) return Promise.resolve();
     const j = job;
-    return DB.putJob(j).then(() => setSaved('Saved'), (e) => { setSaved('Not saved!'); alert('Could not save: ' + e); });
+    return DB.putJob(j).then(() => { setSaved('Saved'); SYNC.soon(); }, (e) => { setSaved('Not saved!'); alert('Could not save: ' + e); });
   }
   function setSaved(txt) {
     const el = document.querySelector('[data-saved]');
@@ -123,9 +123,17 @@
   }
 
   async function nextJobNo() {
-    const n = ((await DB.get('jobCounter')) || 0) + 1;
-    await DB.set('jobCounter', n);
+    // the highest number known on this device (its own counter and every job it has, including other devices' jobs)
+    const jobs = await DB.allJobs();
+    const known = Math.max((await DB.get('jobCounter')) || 0, ...jobs.map((j) => parseInt((String(j.no || '').match(/(\d+)$/) || [])[1], 10) || 0));
+    const fromServer = await SYNC.nextJobNumber(known);       // shared numbering when online
+    const n = fromServer || known + 1;
+    await DB.set('jobCounter', Math.max(n, known));
     return C.jobPrefix + String(n).padStart(4, '0');
+  }
+  function storeSettings() {
+    settings.updatedAt = new Date().toISOString();
+    return DB.set('settings', settings).then(() => SYNC.settingsChanged());
   }
 
   // ---------- left sidebar ----------
@@ -573,7 +581,7 @@
       $('[data-kf-k]').focus();
     }
     function closeForm() { editIdx = null; form.hidden = true; drawKeys(); }
-    async function persist() { await DB.set('settings', settings); }
+    async function persist() { await storeSettings(); }
 
     box.addEventListener('click', async (e) => {
       if (e.target === box) return closeKeypad();
@@ -1085,7 +1093,7 @@
       const v = (prompt(`Type the ${label.toLowerCase()}:`) || '').trim();
       if (v) {
         it[el.dataset.k] = v;
-        if (!settings[listKey].includes(v)) { settings[listKey].push(v); DB.set('settings', settings); }
+        if (!settings[listKey].includes(v)) { settings[listKey].push(v); storeSettings(); }
         touch(); previewSoon();
       }
       el.closest('.sf').innerHTML = `<span>${label}</span>${pick(el.dataset.k, it[el.dataset.k], settings[listKey])}`;
@@ -1116,7 +1124,8 @@
     if (act === 'new-job') await newJob();
     if (act === 'filter') { homeFilter = homeFilter === b.dataset.f ? 'all' : b.dataset.f; return viewHome(); }
     if (act === 'del-job' && confirm(`Delete job ${job.no} and all its measurements? This cannot be undone.`)) {
-      await DB.deleteJob(job.id); job = null; location.hash = '#/';
+      const id = job.id;
+      await DB.deleteJob(id); await SYNC.markDeleted(id); job = null; location.hash = '#/';
     }
     if (act === 'add') {
       const n = newItem(job, b.dataset.type);
@@ -1247,7 +1256,7 @@
     const defaults = { colour: get('dcolour'), glass: { W: get('dglassW'), V: get('dglassV') }, section: { W: get('dsecW'), V: get('dsecV') } };
     const list = (k) => [...new Set([...document.querySelectorAll(`[data-list="${k}"] .chip input`)].map((i) => i.value.trim()).filter(Boolean))];
     settings = { defaults, toleranceMm: tol, keys, glass: list('glass'), colours: list('colours'), locations: list('locations'), floors: list('floors'), sections: list('sections') };
-    await DB.set('settings', settings); fillLists(); toast('Settings saved');
+    await storeSettings(); fillLists(); toast('Settings saved');
   }
   async function exportBackup() {
     const data = { app: 'measurement-to-production', version: 1, exported: new Date().toISOString(),
@@ -1293,11 +1302,49 @@
     if (s) settings = Object.assign(settings, s, { defaults: Object.assign({}, settings.defaults, s.defaults || {}) });
     // the first key pad (SL, OP, TH, BH, FIX, VENT, FAN, MESH, ...) is replaced by the real codes, unless it was changed by hand
     const OLD_KEYS = 'SL,OP,TH,BH,FIX,VENT,FAN,MESH,DOOR,LOUV,T&T,ARCH';
-    if (s && s.keys && s.keys.map((k) => k[0]).join(',') === OLD_KEYS) { settings.keys = C.designKeys.map((x) => x.slice()); DB.set('settings', settings); }
+    if (s && s.keys && s.keys.map((k) => k[0]).join(',') === OLD_KEYS) { settings.keys = C.designKeys.map((x) => x.slice()); storeSettings(); }
     if (!settings.glass.includes('5 mm Pinned')) settings.glass.splice(1, 0, '5 mm Pinned');
     fillLists();
     document.getElementById('ver').textContent = 'Version ' + C.version;
     setTimeout(syncPhotos, 1500);
     route();
+    SYNC.run();
   })();
+
+  // ---------- sharing with the other phones and PCs ----------
+  SYNC.on('synced', (id, updated) => { if (job && job.id === id && job.updated === updated) job.syncedAt = updated; });
+  SYNC.on('status', (st) => {
+    const el = document.getElementById('syncStatus');
+    if (!el) return;
+    const t = st.last ? st.last.toTimeString().slice(0, 5) : '';
+    const w = st.waiting ? ` · ${st.waiting} change${st.waiting === 1 ? '' : 's'} waiting` : '';
+    const text = {
+      off: 'Saved on this device', starting: 'Connecting…', syncing: 'Sharing…',
+      synced: `Shared with all devices${t ? ' · ' + t : ''}${w}`, offline: `Offline · saved on this device${w}`,
+      notsetup: 'Online sharing not set up yet', error: `Could not reach online storage${w}`,
+    }[st.status] || '';
+    el.textContent = text;
+    el.title = st.error || '';
+    el.parentElement.className = 'status ' + ({ synced: 'on', offline: 'off', error: 'off', notsetup: 'off' }[st.status] || '');
+  });
+  SYNC.on('changed', async (ids) => {
+    if (ids.includes('settings')) {
+      const s = await DB.get('settings');
+      if (s) settings = Object.assign(settings, s, { defaults: Object.assign({}, settings.defaults, s.defaults || {}) });
+      fillLists();
+    }
+    const view = (location.hash.replace(/^#\/?/, '').split('/')[0]) || 'home';
+    if (view === 'home') return viewHome().then(renderNav);
+    if (job && ids.includes(job.id) && !SYNC.dirty(job)) {
+      // another device changed the open job: show its changes, unless something is being typed right now
+      const typing = document.activeElement && $app.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+      if (typing || document.querySelector('.kp-back')) return;
+      const fresh = await DB.getJob(job.id);
+      if (!fresh) { job = null; location.hash = '#/'; return toast('This job was deleted on another device'); }
+      const y = window.scrollY;
+      job = fresh; job.items = job.items || [];
+      viewWork(); window.scrollTo(0, y);
+      toast('Updated from another device');
+    } else renderNav();
+  });
 })();

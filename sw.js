@@ -3,8 +3,8 @@
  * app is never out of date; the stored copy is used only when offline. Measurements are saved on
  * the device itself, not here.
  */
-const CACHE = 'm2p-v35';
-const SHELL = ['./', './index.html', './style.css', './config.js', './db.js', './rules.js', './photos.js', './photos.html', './vendor/qrcode.js',  './app.js',
+const CACHE = 'm2p-v36';
+const SHELL = ['./', './index.html', './style.css', './config.js', './db.js', './sync.js', './rules.js', './photos.js', './photos.html', './vendor/qrcode.js',  './app.js',
   './manifest.webmanifest', './assets/titans_logo_trim.png', './assets/m2p-192.png', './assets/m2p-favicon.png', './assets/m2p-apple-180.png'];
 const FONTS = /^https:\/\/(fonts\.googleapis\.com|fonts\.gstatic\.com)\//;
 

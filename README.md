@@ -67,7 +67,7 @@ The sheets:
 - **Installation sheet**: the same plus floor and location, and under each window a **link and QR code to its site photos**.
   Installers open it on any phone with no login (`photos.html`).
 
-**One-time Supabase setup for site photos:** open the quotation software's Supabase project → SQL Editor →
+**One-time Supabase setup for site photos** (and `supabase/m2p-jobs.sql` for sharing jobs): open the quotation software's Supabase project → SQL Editor →
 New query → paste `supabase/m2p-photos.sql` → Run. Until then photos stay on the phone with ↑ (waiting).
 
 **Left sidebar** (on a PC, like the quotation software): Jobs, New job, the open job with its three stages
@@ -77,8 +77,16 @@ The 8 mm limit, the design keys and the colour / glass suggestion lists can be c
 
 ## Where the data is kept
 
-On the device itself (browser storage). It works with no internet on site and can be installed
-as an app on a phone ("Add to Home screen"). Use *Settings → Download backup* to keep a copy or move jobs to another device.
+**Shared by all phones and PCs** (no login), in the quotation software's Supabase project, and also on each
+device so it works without internet on site. Changes are sent within seconds when there is internet and
+fetched from the other devices on opening, every 20 seconds and when the internet returns; if two devices
+change the same job, the newest change wins. Job numbers come from the server, so they never repeat.
+The sidebar shows *Shared with all devices*, *Offline · n changes waiting* or *Online sharing not set up yet*.
+
+**One-time setup:** Supabase → SQL Editor → New query → paste `supabase/m2p-jobs.sql` → Run.
+Without a login, anyone with the app's link can see and change the jobs.
+
+*Settings → Download backup* still makes a copy of everything.
 
 ## Files
 
@@ -90,6 +98,7 @@ as an app on a phone ("Add to Home screen"). Use *Settings → Download backup* 
 | `config.js` | Company name, job number prefix, 8 mm limit, design and glass lists |
 | `photos.js`, `photos.html` | Site photos: upload to Supabase, and the page installers open from the link |
 | `vendor/qrcode.js` | QR codes on the installation sheet (MIT licence, by Kazuhiko Arase) |
+| `sync.js` | Sharing jobs and settings between devices through Supabase |
 | `db.js` | Saving on the device |
 | `style.css` | Look of the app and the printed sheet |
 | `sw.js`, `manifest.webmanifest` | Installable app, works offline |
