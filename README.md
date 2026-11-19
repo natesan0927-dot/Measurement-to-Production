@@ -46,8 +46,9 @@ when the one before is done (the sidebar shows them, locked until then).
 **Production in lots** (a job can go to the factory in parts):
 - *Mark complete & proceed* works when only some windows are measured; the others show **Waiting for measurement**
   and can be measured later.
-- **Generate production lot** puts every approved window that is not in production yet into the next lot
-  (Lot 1, Lot 2, ...), in window order. Windows in a lot show **🔒 In production · Lot n** everywhere, their sizes
+- **Generate production lot** opens a list of the windows: tick the ones ready to make now (any of them,
+  e.g. W1, W5, W6, W15, W17, W20); they become the next lot (Lot 1, Lot 2, ...), in window order. The rest stay
+  pending. Windows not measured, not approved or already in a lot are shown greyed out with the reason. Windows in a lot show **🔒 In production · Lot n** everywhere, their sizes
   are locked, and they are never put in another lot.
 - Step 3 shows one lot at a time (switch Lot 1 / Lot 2 at the top). Each sheet lists the earlier lots
   (not on this sheet) and the windows not in production yet, so nothing is made twice.

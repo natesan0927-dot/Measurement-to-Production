@@ -345,7 +345,7 @@
       review: `<a class="btn ghost" href="#/job/${job.id}">← Measurements</a>
             <span class="footnote">${approved} of ${n} approved · ${job.items.filter((i) => i.lot).length} in production</span>
             ${hasLots(job) ? `<button class="btn ghost" data-act="view-lots">Production lots (${lotsOf(job).length})</button>` : ''}
-            <button class="btn gold" data-act="to-sheet" ${readyForLot(job).length ? '' : 'disabled'} title="${readyForLot(job).length ? '' : 'Approve windows first'}">Generate production lot${readyForLot(job).length ? ` (${readyForLot(job).length})` : ''} →</button>`,
+            <button class="btn gold" data-act="to-sheet" ${readyForLot(job).length ? '' : 'disabled'} title="${readyForLot(job).length ? '' : 'Approve windows first'}">Generate production lot →</button>`,
       sheet: `<a class="btn ghost" href="#/review/${job.id}">← Approval</a>
             ${readyForLot(job).length ? `<span class="footnote">${readyForLot(job).length} approved window${readyForLot(job).length === 1 ? '' : 's'} not in a lot yet</span>` : ''}
             <button class="btn gold" data-act="print">Print / Save PDF</button>`,
@@ -779,6 +779,60 @@
         <div class="sh-sign">${install ? '<div>Installed by</div><div>Customer signature</div><div>Date of installation</div>' : '<div>Measured by</div><div>Approved by</div><div>Production in-charge</div>'}</div>
       </article>`;
   }
+  // ---------- choosing the windows for the next production lot ----------
+  function openLotPicker() {
+    document.querySelectorAll('.kp-back').forEach((x) => x.remove());
+    const no = lotsOf(job).length + 1;
+    const why = (it) => it.lot ? `Lot ${it.lot}` : !RULES.check(it, settings.toleranceMm).complete ? 'not measured' : !it.approved ? 'not approved' : '';
+    const box = document.createElement('div');
+    box.className = 'kp-back';
+    box.innerHTML = `<div class="keypad lotpick" role="dialog" aria-label="Production lot">
+      <div class="lp-head"><b>Production Lot ${no}</b><span class="muted">Tick the windows that are ready to make now. The rest stay pending.</span></div>
+      <div class="lp-tools"><button class="btn small" data-lp="all">Select all ready</button><button class="btn small ghost" data-lp="none">Clear</button><span class="lp-count" data-lp-count></span></div>
+      <div class="lp-list">${job.items.map((it) => {
+        const r = RULES.check(it, settings.toleranceMm), w = why(it);
+        const size = it.final ? `${it.final.w} × ${it.final.h}` : r.complete ? `${r.w.min} × ${r.h.min}` : '–';
+        return `<label class="lp-item ${w ? 'off' : ''} ${it.lot ? 'done' : ''}">
+          <input type="checkbox" data-lp-id="${it.id}" ${w ? 'disabled' : ''}>
+          <b>${esc(it.code)}</b><span>${esc(size)}</span><span class="muted">${esc(it.location || '')}${it.design ? ' · ' + esc(it.design) : ''}</span>
+          ${w ? `<em>${esc(w)}</em>` : ''}</label>`;
+      }).join('')}</div>
+      <div class="kp-act"><button class="btn ghost" data-lp="cancel">Cancel</button><span></span><button class="btn gold" data-lp="make" disabled>Create Lot ${no}</button></div>
+    </div>`;
+    document.body.appendChild(box);
+    const boxes = () => [...box.querySelectorAll('[data-lp-id]:not(:disabled)')];
+    const update = () => {
+      const n = boxes().filter((c) => c.checked).length;
+      box.querySelector('[data-lp-count]').textContent = `${n} selected`;
+      const btn = box.querySelector('[data-lp="make"]');
+      btn.disabled = !n; btn.textContent = n ? `Create Lot ${no} (${n})` : `Create Lot ${no}`;
+    };
+    box.addEventListener('change', update);
+    box.addEventListener('click', async (e) => {
+      if (e.target === box) return box.remove();
+      const t = e.target.closest('[data-lp]');
+      if (!t) return;
+      const k = t.dataset.lp;
+      if (k === 'cancel') return box.remove();
+      if (k === 'all' || k === 'none') { boxes().forEach((c) => (c.checked = k === 'all')); return update(); }
+      if (k === 'make') {
+        const ids = boxes().filter((c) => c.checked).map((c) => c.dataset.lpId);
+        const chosen = job.items.filter((i) => ids.includes(i.id));   // always in window order
+        if (!chosen.length) return;
+        const at = new Date().toISOString();
+        chosen.forEach((i) => { i.lot = no; i.lotAt = at; });
+        (job.lots = job.lots || []).push({ no, at, items: chosen.map((i) => i.id) });
+        viewLot = no; sheetKind = 'factory';
+        box.remove();
+        touch(); await saveNow(); tab = 'sheet';
+        toast(`Lot ${no} created · ${chosen.length} window${chosen.length === 1 ? '' : 's'}`);
+        location.hash = `#/sheet/${job.id}`;
+        viewWork();   // redraw everything, so the windows now in production show as locked
+      }
+    });
+    update();
+  }
+
   // under the sheet: what is already in production (so nothing is made twice) and what is still to come
   function lotNotes(lot) {
     if (!lot) return '';
@@ -1021,21 +1075,8 @@
       if (!job.items.every((x) => x.approved)) toast(n ? `${n} approved` : 'Nothing to approve');
     }
     if (act === 'to-sheet') {
-      const ready = readyForLot(job);
-      if (!ready.length) return toast('Approve windows first');
-      const no = lotsOf(job).length + 1;
-      const waiting = job.items.length - job.items.filter((i) => i.lot).length - ready.length;
-      if (!confirm(`Create production Lot ${no} with ${ready.length} window${ready.length === 1 ? '' : 's'}:\n${ready.map((i) => i.code).join(', ')}` +
-        (waiting ? `\n\n${waiting} other window${waiting === 1 ? ' stays' : 's stay'} pending for a later lot.` : '') +
-        `\n\nWindows in a lot are locked and never repeated in another lot.`)) return;
-      const at = new Date().toISOString();
-      ready.forEach((i) => { i.lot = no; i.lotAt = at; });
-      (job.lots = job.lots || []).push({ no, at, items: ready.map((i) => i.id) });
-      viewLot = no; sheetKind = 'factory';
-      touch(); await saveNow(); tab = 'sheet';
-      toast(`Lot ${no} created`);
-      location.hash = `#/sheet/${job.id}`;
-      viewWork();   // redraw everything, so the windows now in production show as locked
+      if (!readyForLot(job).length) return toast('Approve windows first');
+      openLotPicker();
     }
     if (act === 'view-lots') { await saveNow(); tab = 'sheet'; location.hash = `#/sheet/${job.id}`; }
     if (act === 'lot') { viewLot = Number(b.dataset.no); showPane(); }
