@@ -737,8 +737,8 @@
           <td class="num fit"><b>${esc(it.final.w)}</b></td><td class="num fit"><b>${esc(it.final.h)}</b></td>
           <td class="sh-design fit"><b>${esc(it.design)}</b></td><td class="fit">${esc(it.glass)}</td><td class="fit">${esc(it.colour)}</td><td class="fit">${esc(it.section)}</td>`;
     const row = (it) => install
-      ? `<tr class="has-sub"><td class="fit"><b>${esc(it.code)}</b></td><td class="fit">${esc(it.location)}</td>${common(it)}<td class="rest">${esc(it.remarks)}</td></tr>
-        <tr class="phrow"><td colspan="${cols.length}">${photoLine(it)}</td></tr>`
+      ? `<tr class="${(it.photos || []).length ? 'has-sub' : ''}"><td class="fit"><b>${esc(it.code)}</b></td><td class="fit">${esc(it.location)}</td>${common(it)}<td class="rest">${esc(it.remarks)}</td></tr>
+        ${(it.photos || []).length ? `<tr class="phrow"><td colspan="${cols.length}">${photoLine(it)}</td></tr>` : ''}`
       : `<tr><td class="fit"><b>${esc(it.code)}</b></td>${common(it)}
           <td class="cut"><div class="cutboxes"><span></span><span></span><span></span><span></span></div></td>
           <td class="rest">${esc(it.remarks)}</td></tr>`;

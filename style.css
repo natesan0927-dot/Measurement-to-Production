@@ -751,3 +751,15 @@ button.stat:hover { transform: translateY(-2px); border-color: var(--border-stro
 .lp-item.done em { color: #5B3DB5; background: #EDE7FB; }
 .lp-item:has(input:checked) { background: #F5F1FE; }
 @media (max-width: 560px) { .lp-item { grid-template-columns: 24px 46px minmax(0, 1fr) auto; } .lp-item .muted { display: none; } }
+
+/* installation sheet: a closed grid - every window row has its line underneath; the photo link row (only when
+   the window has photos) is one full-width box inside the grid, directly under its window */
+.sh-table tbody tr.has-sub td { border-bottom: 1px solid #C9CEDF !important; }
+.sh-table tbody tr.phrow td { padding: 8px 10px; background: #FAFBFE !important; border-bottom: 1.5px solid #9AA1BC !important; border-right: 0 !important; }
+.sh-table tbody tr.phrow:last-child td { border-bottom: 2px solid var(--navy-800) !important; }
+.sh-table .ph-link { border: 0; background: none; padding: 0; }
+@media print {
+  .sh-table tbody tr.has-sub td { border-bottom: 0.25mm solid #999 !important; }
+  .sh-table tbody tr.phrow td { background: none !important; border-bottom: 0.4mm solid #444 !important; }
+  .sh-table tbody tr.phrow:last-child td { border-bottom: 0.6mm solid #000 !important; }
+}
