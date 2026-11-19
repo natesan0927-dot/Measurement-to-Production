@@ -779,3 +779,24 @@ button.stat:hover { transform: translateY(-2px); border-color: var(--border-stro
 
 .final .btn.danger { color: var(--bad); border-color: #F1C9D0; }
 .footbar .btn.danger { color: var(--bad); border-color: #F1C9D0; }
+
+/* ---------- production summary ---------- */
+.sumpick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.sumpick > span { font-weight: 700; font-size: 13px; color: var(--ink-soft); margin-right: 4px; }
+.sumlot { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid var(--border-strong); border-radius: 99px; font-weight: 700; font-size: 13.5px; color: var(--navy-800); cursor: pointer; }
+.sumlot input { width: 17px; height: 17px; accent-color: #5B3DB5; }
+.sumlot small { font-weight: 500; color: var(--ink-muted); }
+.sumlot:has(input:checked) { background: #F5F1FE; border-color: #7C5CD6; }
+.sheet .doctitle.sumtitle { background: #5B3DB5; }
+.sumtotals { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 4px 0 16px; }
+.sumtotals div { border: 1.5px solid #9AA1BC; border-radius: 8px; padding: 10px 14px; }
+.sumtotals b { display: block; font-size: 26px; font-weight: 800; color: var(--navy-800); line-height: 1.1; }
+.sumtotals span { font-size: 12.5px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .06em; }
+.sumh { font-size: 15px; margin: 14px 0 6px; color: var(--navy-800); font-family: var(--font); }
+.sumtable { margin-bottom: 6px; }
+@media print {
+  .sumtotals b { font-size: 18pt; }
+  .sumtotals div { border-color: #444; }
+  .sheet .doctitle.sumtitle { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+@media (max-width: 640px) { .sumtotals { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

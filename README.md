@@ -56,7 +56,11 @@ when the one before is done (the sidebar shows them, locked until then).
 - Step 3 shows one lot at a time (switch Lot 1 / Lot 2 at the top). Each sheet lists the earlier lots
   (not on this sheet) and the windows not in production yet, so nothing is made twice.
 
-**Two production sheets** (switch at the top of step 3):
+**Production sheets** (switch at the top of step 3): Factory sheet, Installation sheet and
+**Summary**: tick the lots to include; it totals windows, ventilators and area (sq.ft), lists each lot, and
+breaks the windows down by type, section, design, colour and glass with quantities and codes.
+
+The sheets:
 - **Factory sheet**, in this order: Code | W | H | Design | Glass | Colour | Section | 4 large cutting-size
   boxes (written in by hand) | Remarks (taking the rest of the width).
 - **Installation sheet**: the same plus floor and location, and under each window a **link and QR code to its site photos**.

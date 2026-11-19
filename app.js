@@ -209,7 +209,7 @@
     if (view === 'settings') { viewSettings(); return renderNav(); }
     job = await DB.getJob(id);
     if (!job) { location.hash = '#/'; return; }
-    siteOpen = null; openRows.clear();
+    siteOpen = null; openRows.clear(); summaryLots = null;
     job.items = job.items || [];
     job.items.forEach(dropStaleApproval);
     if (view === 'review' && !canReview(job)) { location.replace(`#/job/${id}`); return; }
@@ -339,11 +339,11 @@
     ws.dataset.pane = pane;
     $app.querySelector('[data-steps]').innerHTML = steps(pane);
     const show = wide() ? tab : pane;
-    $app.querySelector('[data-ptitle]').textContent = show === 'sheet' ? (sheetKind === 'install' ? 'Installation sheet' : 'Factory sheet') : 'Approve each window';
+    $app.querySelector('[data-ptitle]').textContent = show === 'sheet' ? ({ install: 'Installation sheet', summary: 'Production summary' }[sheetKind] || 'Factory sheet') : 'Approve each window';
     $app.querySelector('[data-psub]').textContent = `${job.no} · ${job.customer || 'No customer name'}` +
-      (show === 'sheet' ? (sheetKind === 'install' ? ' · for the installation team' : ' · for the factory') : ' · check the sizes, then approve');
+      (show === 'sheet' ? ({ install: ' · for the installation team', summary: ' · totals of the lots you choose' }[sheetKind] || ' · for the factory') : ' · check the sizes, then approve');
     $app.querySelector('[data-paction]').innerHTML = show === 'sheet'
-      ? `${lotsOf(job).length > 1 ? `<div class="seg lots">${lotsOf(job).map((l) => `<button data-act="lot" data-no="${l.no}" class="${l.no === viewLot ? 'on' : ''}">Lot ${l.no}</button>`).join('')}</div>` : ''}<div class="seg"><button data-act="kind" data-k="factory" class="${sheetKind === 'factory' ? 'on' : ''}">Factory sheet</button><button data-act="kind" data-k="install" class="${sheetKind === 'install' ? 'on' : ''}">Installation sheet</button></div>`
+      ? `${lotsOf(job).length > 1 && sheetKind !== 'summary' ? `<div class="seg lots">${lotsOf(job).map((l) => `<button data-act="lot" data-no="${l.no}" class="${l.no === viewLot ? 'on' : ''}">Lot ${l.no}</button>`).join('')}</div>` : ''}<div class="seg"><button data-act="kind" data-k="factory" class="${sheetKind === 'factory' ? 'on' : ''}">Factory sheet</button><button data-act="kind" data-k="install" class="${sheetKind === 'install' ? 'on' : ''}">Installation sheet</button><button data-act="kind" data-k="summary" class="${sheetKind === 'summary' ? 'on' : ''}">Summary</button></div>`
       : `<button class="btn small" data-act="approve-ok">Approve all within ${settings.toleranceMm} mm</button>`;
     const approved = job.items.filter((i) => i.approved).length;
     const n = job.items.length;
@@ -356,7 +356,7 @@
             <button class="btn gold" data-act="to-sheet" ${readyForLot(job).length ? '' : 'disabled'} title="${readyForLot(job).length ? '' : 'Approve windows first'}">Generate production lot →</button>`,
       sheet: `<a class="btn ghost" href="#/review/${job.id}">← Approval</a>
             ${readyForLot(job).length ? `<span class="footnote">${readyForLot(job).length} approved window${readyForLot(job).length === 1 ? '' : 's'} not in a lot yet</span>` : ''}
-            <button class="btn ghost danger" data-act="reverse-lot">↩ Reverse Lot ${viewLot}</button>
+            ${sheetKind !== 'summary' ? `<button class="btn ghost danger" data-act="reverse-lot">↩ Reverse Lot ${viewLot}</button>` : ''}
             <button class="btn gold" data-act="print">Print / Save PDF</button>`,
     };
     // wide screen: measurements are always on the left, so the buttons follow the right-hand tab
@@ -734,6 +734,7 @@
     catch (err) { return ''; }
   }
   function sheetHtml() {
+    if (sheetKind === 'summary') return summaryHtml();
     const install = sheetKind === 'install';
     const lot = lotsOf(job).find((l) => l.no === viewLot) || lotsOf(job)[lotsOf(job).length - 1];
     const items = lot ? job.items.filter((i) => i.lot === lot.no) : [];
@@ -851,6 +852,81 @@
       }
     });
     update();
+  }
+
+  // ---------- production summary of the chosen lots ----------
+  let summaryLots = null;          // lot numbers ticked for the summary (null: all)
+  const sqft = (it) => (Number(it.final.w) * Number(it.final.h)) / 92903.04;
+  const f2 = (n) => (Math.round(n * 100) / 100).toFixed(2);
+  function sheetHeader(title, cls, extra) {
+    return `<header class="hdr">
+          <img src="assets/titans_logo_trim.png" alt="Titans">
+          <div class="who">
+            <div class="co">${esc(C.company)}</div>
+            <div class="addr">${esc(C.address || '')}</div>
+            <div class="contact">
+              <span><em>Phone</em>${esc(C.phone || '')}${C.phone2 ? '<br>' + esc(C.phone2) : ''}</span>
+              <span><em>Email</em>${esc(C.email || '')}</span>
+            </div>
+          </div>
+          <div class="doctitle ${cls}">${title}</div>
+          <div class="meta">
+            <div><em>Job No.</em>${esc(job.no)}</div>
+            <div><em>Customer</em>${esc(job.customer) || '–'}</div>
+            <div><em>Phone</em>${esc(job.phone) || '–'}</div>
+            <div><em>Site</em>${esc(job.site) || '–'}</div>
+            <div><em>Measured by</em>${esc(job.measuredBy) || '–'}</div>
+            <div><em>Date</em>${fmtDate(job.date) || '–'}</div>
+            ${extra || ''}
+            ${job.address ? `<div class="wide"><em>Address</em>${esc(job.address)}</div>` : ''}
+          </div>
+        </header>`;
+  }
+  function summaryHtml() {
+    const all = lotsOf(job);
+    const chosen = all.filter((l) => !summaryLots || summaryLots.includes(l.no));
+    const items = job.items.filter((i) => i.lot && chosen.some((l) => l.no === i.lot));
+    const isV = (i) => i.type === 'V';
+    const nW = items.filter((i) => !isV(i)).length, nV = items.filter(isV).length;
+    const area = items.reduce((a, i) => a + sqft(i), 0);
+    // group identical windows: type, section, design, colour, glass
+    const groups = [];
+    items.forEach((i) => {
+      const key = [i.type, i.section, i.design, i.colour, i.glass].join('|');
+      let g = groups.find((x) => x.key === key);
+      if (!g) groups.push(g = { key, it: i, codes: [], area: 0 });
+      g.codes.push(i.code); g.area += sqft(i);
+    });
+    groups.sort((a, b) => (a.it.type === b.it.type ? 0 : a.it.type === 'W' ? -1 : 1));
+    const pick = `<div class="sumpick noprint"><span>Lots in this summary:</span>
+      ${all.map((l) => `<label class="sumlot"><input type="checkbox" data-sumlot="${l.no}" ${chosen.includes(l) ? 'checked' : ''}> Lot ${l.no} <small>${fmtDate(l.at)}</small></label>`).join('')}
+      <button class="btn small ghost" data-act="sum-all">All lots</button></div>`;
+    return `${pick}
+      <article class="sheet sumsheet">
+        ${sheetHeader('Production summary', 'sumtitle', `<div class="lotcell"><em>Lots</em>${chosen.length ? chosen.map((l) => l.no).join(', ') : '–'}</div>`)}
+        ${!chosen.length ? '<p class="empty">Tick at least one lot above.</p>' : `
+        <div class="sumtotals">
+          <div><b>${nW}</b><span>Windows</span></div>
+          <div><b>${nV}</b><span>Ventilators</span></div>
+          <div><b>${items.length}</b><span>Total</span></div>
+          <div><b>${f2(area)}</b><span>Total area (sq.ft)</span></div>
+        </div>
+        <h3 class="sumh">Lots included</h3>
+        <table class="sh-table sumtable">
+          <thead><tr><th class="fit">Lot</th><th class="fit">Date</th><th class="fit">Windows</th><th class="fit">Ventilators</th><th class="fit">Area (sq.ft)</th><th class="rest">Codes</th></tr></thead>
+          <tbody>${chosen.map((l) => {
+            const li = items.filter((i) => i.lot === l.no);
+            return `<tr><td class="fit"><b>Lot ${l.no}</b></td><td class="fit">${fmtDate(l.at)}</td><td class="fit"><b>${li.filter((i) => !isV(i)).length}</b></td><td class="fit"><b>${li.filter(isV).length}</b></td><td class="fit">${f2(li.reduce((a, i) => a + sqft(i), 0))}</td><td class="rest">${li.map((i) => esc(i.code)).join(', ')}</td></tr>`;
+          }).join('')}</tbody>
+        </table>
+        <h3 class="sumh">Breakdown</h3>
+        <table class="sh-table sumtable">
+          <thead><tr><th class="fit">Type</th><th class="fit">Section</th><th class="fit">Design</th><th class="fit">Colour</th><th class="fit">Glass</th><th class="fit">Qty</th><th class="fit">Area (sq.ft)</th><th class="rest">Codes</th></tr></thead>
+          <tbody>${groups.map((g) => `<tr><td class="fit">${esc(typeOf(g.it.type).label)}</td><td class="fit">${esc(g.it.section || '–')}</td><td class="fit sh-design"><b>${esc(g.it.design || '–')}</b></td><td class="fit">${esc(g.it.colour || '–')}</td><td class="fit">${esc(g.it.glass || '–')}</td><td class="fit"><b>${g.codes.length}</b></td><td class="fit">${f2(g.area)}</td><td class="rest">${g.codes.map(esc).join(', ')}</td></tr>`).join('')}</tbody>
+        </table>
+        ${job.items.some((i) => !i.lot) ? `<div class="lotnotes"><div><b>Not in any lot yet:</b> ${job.items.filter((i) => !i.lot).map((i) => esc(i.code)).join(', ')}</div></div>` : ''}`}
+        <div class="sh-sign"><div>Prepared by</div><div>Checked by</div><div>Production in-charge</div></div>
+      </article>`;
   }
 
   // under the sheet: what is already in production (so nothing is made twice) and what is still to come
@@ -997,6 +1073,11 @@
     if (el.matches('[data-import]')) return importBackup(el.files[0]);
     if (!job) return;
     const it = itemOf(el);
+    if (el.matches('[data-sumlot]')) {
+      summaryLots = [...$app.querySelectorAll('[data-sumlot]')].filter((c) => c.checked).map((c) => Number(c.dataset.sumlot));
+      if (summaryLots.length === lotsOf(job).length) summaryLots = null;
+      return renderPreview();
+    }
     if (el.matches('[data-photos]') && it && el.files.length) { await addPhotos(it, [...el.files]); return; }
     if (el.value === '__other' && it && LISTS[el.dataset.k]) {
       const [listKey, label] = LISTS[el.dataset.k];
@@ -1056,6 +1137,7 @@
     }
     if (act === 'keypad' && it) openKeypad(it);
     if (act === 'kind') { sheetKind = b.dataset.k; showPane(); }
+    if (act === 'sum-all') { summaryLots = null; renderPreview(); }
     if (act === 'ph-del' && it) {
       e.preventDefault();
       const id = b.closest('[data-ph]').dataset.ph;
