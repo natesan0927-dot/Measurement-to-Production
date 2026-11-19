@@ -356,6 +356,7 @@
             <button class="btn gold" data-act="to-sheet" ${readyForLot(job).length ? '' : 'disabled'} title="${readyForLot(job).length ? '' : 'Approve windows first'}">Generate production lot →</button>`,
       sheet: `<a class="btn ghost" href="#/review/${job.id}">← Approval</a>
             ${readyForLot(job).length ? `<span class="footnote">${readyForLot(job).length} approved window${readyForLot(job).length === 1 ? '' : 's'} not in a lot yet</span>` : ''}
+            <button class="btn ghost danger" data-act="reverse-lot">↩ Reverse Lot ${viewLot}</button>
             <button class="btn gold" data-act="print">Print / Save PDF</button>`,
     };
     // wide screen: measurements are always on the left, so the buttons follow the right-hand tab
@@ -674,7 +675,8 @@
           </div>
           ${it.final && !it.approved && (Number(it.final.w) !== r.w.min || Number(it.final.h) !== r.h.min) ? `<small class="muted">Edited (least was ${mm(r.w.min)} × ${mm(r.h.min)})</small>` : ''}
           ${it.lot
-            ? `<div class="lotlock">Sent to production in <b>Lot ${it.lot}</b> on ${fmtDate(it.lotAt)}. Locked, so it is not made twice.</div>`
+            ? `<div class="lotlock">Sent to production in <b>Lot ${it.lot}</b> on ${fmtDate(it.lotAt)}. Locked, so it is not made twice.</div>
+               <button class="btn small ghost danger" data-act="unlot">↩ Take out of Lot ${it.lot}</button>`
             : it.approved
             ? `<button class="btn small ghost" data-act="unapprove">Undo approval</button>`
             : `<button class="btn small gold" data-act="approve" ${r.complete ? '' : 'disabled'}>Approve</button>`}
@@ -773,7 +775,7 @@
             <div><em>Site</em>${esc(job.site) || '–'}</div>
             <div><em>Measured by</em>${esc(job.measuredBy) || '–'}</div>
             <div><em>Date</em>${fmtDate(job.date) || '–'}</div>
-            ${lot ? `<div class="lotcell"><em>Production lot</em>Lot ${lot.no} of ${lotsOf(job).length} · ${fmtDate(lot.at)}</div>` : ''}
+            ${lot ? `<div class="lotcell"><em>Production lot</em>Lot ${lot.no} · ${fmtDate(lot.at)}</div>` : ''}
             ${job.address ? `<div class="wide"><em>Address</em>${esc(job.address)}</div>` : ''}
           </div>
         </header>
@@ -789,10 +791,17 @@
         <div class="sh-sign">${install ? '<div>Installed by</div><div>Customer signature</div><div>Date of installation</div>' : '<div>Measured by</div><div>Approved by</div><div>Production in-charge</div>'}</div>
       </article>`;
   }
+  // back out of production: unlocked, and needs approving again
+  function unlot(it) {
+    delete it.lot; delete it.lotAt;
+    it.approved = false; it.approvedAt = null; it.approvedSig = null; it.final = null;
+  }
+
   // ---------- choosing the windows for the next production lot ----------
   function openLotPicker() {
     document.querySelectorAll('.kp-back').forEach((x) => x.remove());
-    const no = lotsOf(job).length + 1;
+    // lot numbers are never reused, even after a lot is reversed (a printed "Lot 1" stays unique)
+    const no = Math.max(job.lastLot || 0, lotsOf(job).reduce((m, l) => Math.max(m, l.no), 0)) + 1;
     const why = (it) => it.lot ? `Lot ${it.lot}` : !RULES.check(it, settings.toleranceMm).complete ? 'not measured' : !it.approved ? 'not approved' : '';
     const box = document.createElement('div');
     box.className = 'kp-back';
@@ -832,6 +841,7 @@
         const at = new Date().toISOString();
         chosen.forEach((i) => { i.lot = no; i.lotAt = at; });
         (job.lots = job.lots || []).push({ no, at, items: chosen.map((i) => i.id) });
+        job.lastLot = no;
         viewLot = no; sheetKind = 'factory';
         box.remove();
         touch(); await saveNow(); tab = 'sheet';
@@ -1093,6 +1103,28 @@
     if (act === 'to-sheet') {
       if (!readyForLot(job).length) return toast('Approve windows first');
       openLotPicker();
+    }
+    if (act === 'reverse-lot') {
+      const lot = lotsOf(job).find((l) => l.no === viewLot);
+      if (!lot) return;
+      const items = job.items.filter((i) => i.lot === lot.no);
+      if (!confirm(`Reverse Lot ${lot.no}?\n\n${items.map((i) => i.code).join(', ')} will be taken out of production and go back to approval, so they can be edited and approved again.\n\nOnly do this if the factory has not started on this lot.`)) return;
+      items.forEach(unlot);
+      job.lots = lotsOf(job).filter((l) => l !== lot);
+      viewLot = hasLots(job) ? lotsOf(job)[lotsOf(job).length - 1].no : null;
+      touch(); await saveNow();
+      toast(`Lot ${lot.no} reversed · ${items.length} window${items.length === 1 ? '' : 's'} back to approval`);
+      tab = 'review'; location.hash = `#/review/${job.id}`; viewWork();
+    }
+    if (act === 'unlot' && it && it.lot) {
+      const no = it.lot;
+      if (!confirm(`Take ${it.code} out of Lot ${no}?\n\nIt goes back to approval so it can be edited and approved again. Only do this if the factory has not made it yet.`)) return;
+      unlot(it);
+      const lot = lotsOf(job).find((l) => l.no === no);
+      if (lot) { lot.items = lot.items.filter((id) => id !== it.id); if (!lot.items.length) job.lots = lotsOf(job).filter((l) => l !== lot); }
+      if (!lotsOf(job).some((l) => l.no === viewLot)) viewLot = hasLots(job) ? lotsOf(job)[lotsOf(job).length - 1].no : null;
+      touch(); await saveNow(); viewWork();
+      toast(`${it.code} taken out of Lot ${no} · edit it and approve again`);
     }
     if (act === 'view-lots') { await saveNow(); tab = 'sheet'; location.hash = `#/sheet/${job.id}`; }
     if (act === 'lot') { viewLot = Number(b.dataset.no); showPane(); }

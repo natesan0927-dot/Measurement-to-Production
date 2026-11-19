@@ -51,6 +51,8 @@ when the one before is done (the sidebar shows them, locked until then).
   e.g. W1, W5, W6, W15, W17, W20); they become the next lot (Lot 1, Lot 2, ...), in window order. The rest stay
   pending. Windows not measured, not approved or already in a lot are shown greyed out with the reason. Windows in a lot show **🔒 In production · Lot n** everywhere, their sizes
   are locked, and they are never put in another lot.
+- **↩ Reverse Lot n** (in step 3) takes the whole lot back to approval; **↩ Take out of Lot n** (on a window in
+  the approval page) does it for one window. They are unlocked to edit, then approved and put in a lot again.
 - Step 3 shows one lot at a time (switch Lot 1 / Lot 2 at the top). Each sheet lists the earlier lots
   (not on this sheet) and the windows not in production yet, so nothing is made twice.
 
